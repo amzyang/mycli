@@ -15,6 +15,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.named_commands import register as ptoolkit_register
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.selection import SelectionType
+from prompt_toolkit.filters.cli import ViInsertMode
 
 from mycli.constants import DOCS_URL
 from mycli.packages import key_binding_utils
@@ -66,6 +67,7 @@ def edit_and_execute(event: KeyPressEvent) -> None:
 def mycli_bindings(mycli) -> KeyBindings:
     """Custom key bindings for mycli."""
     kb = KeyBindings()
+    insert_mode = ViInsertMode()
 
     @kb.add('f1')
     def _(event: KeyPressEvent) -> None:
@@ -326,5 +328,23 @@ def mycli_bindings(mycli) -> KeyBindings:
             event.app.current_buffer.validate_and_handle()
         else:
             event.app.current_buffer.insert_text("\n")
+
+    @kb.add('c-p', filter=insert_mode)
+    def _(event):
+        b = event.current_buffer
+
+        if b.complete_state:
+            b.complete_previous()
+        else:
+            event.current_buffer.auto_up(count=event.arg)
+
+    @kb.add('c-n', filter=insert_mode)
+    def _(event):
+        b = event.current_buffer
+
+        if b.complete_state:
+            b.complete_next()
+        else:
+            event.current_buffer.auto_down(count=event.arg)
 
     return kb
