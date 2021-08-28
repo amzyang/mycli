@@ -4,6 +4,7 @@ from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.filters import completion_is_selected, control_is_searchable, emacs_mode
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+from prompt_toolkit.filters.cli import ViInsertMode
 
 from mycli.packages import shortcuts
 from mycli.packages.toolkit.fzf import search_history
@@ -14,6 +15,7 @@ _logger = logging.getLogger(__name__)
 def mycli_bindings(mycli) -> KeyBindings:
     """Custom key bindings for mycli."""
     kb = KeyBindings()
+    insert_mode = ViInsertMode()
 
     @kb.add("f2")
     def _(_event: KeyPressEvent) -> None:
@@ -180,5 +182,23 @@ def mycli_bindings(mycli) -> KeyBindings:
             event.app.current_buffer.validate_and_handle()
         else:
             event.app.current_buffer.insert_text("\n")
+
+    @kb.add('c-p', filter=insert_mode)
+    def _(event):
+        b = event.current_buffer
+
+        if b.complete_state:
+            b.complete_previous()
+        else:
+            event.current_buffer.auto_up(count=event.arg)
+
+    @kb.add('c-n', filter=insert_mode)
+    def _(event):
+        b = event.current_buffer
+
+        if b.complete_state:
+            b.complete_next()
+        else:
+            event.current_buffer.auto_down(count=event.arg)
 
     return kb
