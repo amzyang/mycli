@@ -869,7 +869,8 @@ class MyCli(object):
                 enable_system_prompt=True,
                 enable_suspend=True,
                 editing_mode=editing_mode,
-                search_ignore_case=True
+                search_ignore_case=True,
+                enable_history_search=True,
             )
 
         try:
