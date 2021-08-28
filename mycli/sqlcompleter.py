@@ -1108,6 +1108,8 @@ class SQLCompleter(Completer):
         smart_completion: bool | None = None,
     ) -> Iterable[Completion]:
         word_before_cursor = document.get_word_before_cursor(WORD=True)
+        if not word_before_cursor:
+            return []
         if smart_completion is None:
             smart_completion = self.smart_completion
 
