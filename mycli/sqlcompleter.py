@@ -1102,6 +1102,8 @@ class SQLCompleter(Completer):
 
     def get_completions(self, document, complete_event, smart_completion=None):
         word_before_cursor = document.get_word_before_cursor(WORD=True)
+        if not word_before_cursor:
+            return []
         if smart_completion is None:
             smart_completion = self.smart_completion
 
