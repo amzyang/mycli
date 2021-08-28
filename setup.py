@@ -22,7 +22,7 @@ install_requirements = [
     'cryptography >= 1.0.0',
     # 'Pygments>=1.6,<=2.11.1',
     'Pygments>=1.6',
-    'prompt_toolkit>=3.0.6,<4.0.0',
+    'prompt_toolkit @ git+https://github.com/amzyang/python-prompt-toolkit',
     'PyMySQL >= 0.9.2',
     'sqlparse>=0.3.0,<0.5.0',
     'sqlglot>=5.1.3',
