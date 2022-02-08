@@ -27,6 +27,7 @@ import sqlparse
 import sqlglot
 from mycli.packages.parseutils import is_dropping_database, is_destructive
 from prompt_toolkit.completion import DynamicCompleter
+from prompt_toolkit.cursor_shapes import ModalCursorShapeConfig
 from prompt_toolkit.enums import DEFAULT_BUFFER, EditingMode
 from prompt_toolkit.key_binding.bindings.named_commands import register as prompt_register
 from prompt_toolkit.shortcuts import PromptSession, CompleteStyle
@@ -871,6 +872,7 @@ class MyCli(object):
                 editing_mode=editing_mode,
                 search_ignore_case=True,
                 enable_history_search=True,
+                cursor=ModalCursorShapeConfig(),
             )
 
         try:
