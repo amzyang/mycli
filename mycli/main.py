@@ -28,6 +28,7 @@ import click
 from configobj import ConfigObj
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import Completion, DynamicCompleter
+from prompt_toolkit.cursor_shapes import ModalCursorShapeConfig
 from prompt_toolkit.document import Document
 from prompt_toolkit.enums import DEFAULT_BUFFER, EditingMode
 from prompt_toolkit.filters import HasFocus, IsDone
@@ -982,6 +983,7 @@ class MyCli:
                 editing_mode=editing_mode,
                 search_ignore_case=True,
                 enable_history_search=True,
+                cursor=ModalCursorShapeConfig(),
             )
 
         try:
