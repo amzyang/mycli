@@ -37,6 +37,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory, ThreadedAutoSuggest
 from prompt_toolkit.completion import Completion, DynamicCompleter
+from prompt_toolkit.cursor_shapes import ModalCursorShapeConfig
 from prompt_toolkit.document import Document
 from prompt_toolkit.enums import DEFAULT_BUFFER, EditingMode
 from prompt_toolkit.filters import Condition, HasFocus, IsDone
@@ -1360,6 +1361,7 @@ class MyCli:
                 enable_suspend=True,
                 editing_mode=editing_mode,
                 search_ignore_case=True,
+                cursor=ModalCursorShapeConfig(),
             )
 
             if self.key_bindings == 'vi':
