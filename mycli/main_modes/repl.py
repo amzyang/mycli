@@ -32,6 +32,7 @@ from prompt_toolkit.formatted_text import (
     to_formatted_text,
     to_plain_text,
 )
+from prompt_toolkit.cursor_shapes import ModalCursorShapeConfig
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout.processors import ConditionalProcessor, HighlightMatchingBracketProcessor
 from prompt_toolkit.lexers import PygmentsLexer
@@ -600,6 +601,7 @@ def _build_prompt_session(
             enable_suspend=True,
             editing_mode=editing_mode,
             search_ignore_case=True,
+            cursor=ModalCursorShapeConfig(),
         )
 
         if mycli.key_bindings == 'vi':
