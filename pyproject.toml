@@ -12,7 +12,7 @@ dependencies = [
     "click >= 8.3.1",
     "cryptography >= 1.0.0",
     "Pygments ~= 2.19.2",
-    "prompt_toolkit>=3.0.6,<4.0.0",
+    "prompt-toolkit @ git+https://github.com/amzyang/python-prompt-toolkit@v1",
     "PyMySQL >= 0.9.2",
     "sqlparse>=0.3.0,<0.6.0",
     "sqlglot[rs] == 27.*",
