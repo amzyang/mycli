@@ -1137,7 +1137,7 @@ class MyCli:
                 reserve_space_for_menu=self.get_reserved_space(),
                 message=get_message,
                 prompt_continuation=get_continuation,
-                bottom_toolbar=get_toolbar_tokens,
+                bottom_toolbar=None,
                 complete_style=complete_style,
                 input_processors=[
                     ConditionalProcessor(
