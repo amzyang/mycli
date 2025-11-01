@@ -170,6 +170,53 @@ def open_mylogin_cnf(name: str) -> TextIOWrapper | None:
     return TextIOWrapper(plaintext)
 
 
+def read_login_path_config(login_path_name: str, keys: list[str]) -> dict[str, str | None]:
+    """从 .mylogin.cnf 读取指定 login-path 的配置。
+
+    Args:
+        login_path_name: login-path section 名称
+        keys: 要读取的配置项列表
+
+    Returns:
+        配置字典，key 为配置项名，value 为配置值（如果不存在则为 None）
+
+    Raises:
+        FileNotFoundError: .mylogin.cnf 文件不存在
+        KeyError: 指定的 login-path section 不存在
+    """
+    # 获取 .mylogin.cnf 文件路径
+    mylogin_cnf_path = get_mylogin_cnf_path()
+    if not mylogin_cnf_path:
+        raise FileNotFoundError("Login path file (.mylogin.cnf) not found")
+
+    # 打开并解密文件
+    mylogin_cnf = open_mylogin_cnf(mylogin_cnf_path)
+    if not mylogin_cnf:
+        raise ValueError("Unable to read or decrypt login path file")
+
+    # 读取配置文件
+    config = read_config_file(mylogin_cnf, list_values=False)
+    if not config:
+        raise ValueError("Unable to parse login path file")
+
+    # 检查 section 是否存在
+    if login_path_name not in config:
+        raise KeyError(f"Login path '{login_path_name}' not found in .mylogin.cnf")
+
+    # 从指定 section 读取配置
+    section = config[login_path_name]
+    result: dict[str, str | None] = {}
+
+    for key in keys:
+        if key in section:
+            value = section[key]
+            result[key] = strip_matching_quotes(value) if isinstance(value, str) else value
+        else:
+            result[key] = None
+
+    return result
+
+
 # TODO reuse code between encryption an decryption
 def encrypt_mylogin_cnf(plaintext: IO[str]) -> BytesIO:
     """Encryption of .mylogin.cnf file, analogous to calling
