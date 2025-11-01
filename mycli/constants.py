@@ -8,6 +8,7 @@ KNOWN_DSN_QUERY_PARAMS = {
     'boundary_id',
     'character_set',
     'keepalive_ticks',
+    'login-path',
     'prompt',
     'socket',
     'ssh_jump',
