@@ -11,6 +11,7 @@ KNOWN_DSN_QUERY_PARAMS = {
     'character_set',
     'keepalive_ticks',
     'kubectl_resource',
+    'login-path',
     'prompt',
     'socket',
     'ssh_jump',
