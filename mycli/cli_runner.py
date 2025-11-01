@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import click
 
-from mycli.config import str_to_bool
+from mycli.config import read_login_path_config, str_to_bool
 from mycli.constants import EMPTY_PASSWORD_FLAG_SENTINEL
 from mycli.main_modes.batch import main_batch_from_stdin, main_batch_with_progress_bar, main_batch_without_progress_bar
 from mycli.main_modes.checkup import main_checkup
@@ -32,6 +32,7 @@ ENV_VAR_PATTERN = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
 KNOWN_DSN_QUERY_PARAMS = {
     'character_set',
     'keepalive_ticks',
+    'login-path',
     'socket',
     'ssh_jump',
     'ssl_ca',
@@ -245,6 +246,20 @@ def run_from_cli_args(cli_args: 'CliArgs', client_factory: ClientFactory) -> Non
             cli_args.host = dsn_host
         if not cli_args.port:
             cli_args.port = dsn_port
+
+        # 处理 login-path query 参数
+        if params := dsn_params.get('login-path'):
+            login_path_name = params[0]
+            login_config = read_login_path_config(
+                login_path_name,
+                keys=['user', 'password', 'host', 'port', 'socket'],
+            )
+            # URI 参数优先，login-path 作为默认值
+            cli_args.user = cli_args.user or login_config.get('user')
+            cli_args.password = cli_args.password or login_config.get('password')
+            cli_args.host = cli_args.host or login_config.get('host')
+            cli_args.port = cli_args.port or int(login_config.get('port'))
+            cli_args.socket = cli_args.socket or login_config.get('socket')
 
         if unknown_dsn_params := sorted(set(dsn_params) - KNOWN_DSN_QUERY_PARAMS):
             click.secho(
