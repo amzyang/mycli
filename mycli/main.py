@@ -1714,6 +1714,21 @@ def click_entrypoint(
         else:
             dsn_params = {}
 
+        # 处理 login-path query 参数
+        if params := dsn_params.get('login-path'):
+            login_path_name = params[0]
+            from mycli.config import read_login_path_config
+            login_config = read_login_path_config(
+                login_path_name,
+                keys=['user', 'password', 'host', 'port', 'socket',]
+            )
+            # URI 参数优先，login-path 作为默认值
+            user = user or login_config.get('user')
+            password = password or login_config.get('password')
+            host = host or login_config.get('host')
+            port = port or int(login_config.get('port'))
+            socket = socket or login_config.get('socket')
+
         if params := dsn_params.get('ssl'):
             click.secho(
                 'Warning: The "ssl" DSN URI parameter is deprecated and will be removed in a future release. '
