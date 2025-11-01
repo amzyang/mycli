@@ -7,6 +7,7 @@ DEFAULT_CHARSET = 'utf8mb4'
 KNOWN_DSN_QUERY_PARAMS = {
     'character_set',
     'keepalive_ticks',
+    'login-path',
     'prompt',
     'socket',
     'ssh_jump',
