@@ -128,6 +128,11 @@ auto_vertical_output = False
 # keyword casing preference. Possible values "lower", "upper", "auto"
 keyword_casing = auto
 
+# Enable eager column completion: when SELECT is typed without a FROM clause,
+# auto-complete column names from all tables in the current database.
+# Set to False to only complete columns from explicitly specified tables.
+eager_column_completion = True
+
 # disabled pager on startup
 enable_pager = True
 

@@ -199,8 +199,12 @@ class MyCli:
 
         # Initialize completer.
         self.smart_completion = c["main"].as_bool("smart_completion")
+        self.eager_column_completion = c["main"].as_bool("eager_column_completion")
         self.completer = SQLCompleter(
-            self.smart_completion, supported_formats=self.main_formatter.supported_formats, keyword_casing=keyword_casing
+            self.smart_completion,
+            supported_formats=self.main_formatter.supported_formats,
+            keyword_casing=keyword_casing,
+            eager_column_completion=self.eager_column_completion,
         )
         self._completer_lock = threading.Lock()
 

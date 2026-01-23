@@ -777,9 +777,11 @@ class SQLCompleter(Completer):
         smart_completion: bool = True,
         supported_formats: tuple = (),
         keyword_casing: str = "auto",
+        eager_column_completion: bool = True,
     ) -> None:
         super(self.__class__, self).__init__()
         self.smart_completion = smart_completion
+        self.eager_column_completion = eager_column_completion
         self.reserved_words = set()
         for x in self.keywords:
             self.reserved_words.update(x.split())
@@ -1081,7 +1083,14 @@ class SQLCompleter(Completer):
             if suggestion["type"] == "column":
                 tables = suggestion["tables"]
                 _logger.debug("Completion column scope: %r", tables)
-                scoped_cols = self.populate_scoped_cols(tables)
+
+                # When no tables are in scope but eager_column_completion is enabled,
+                # return all columns from the current database
+                if not tables and self.eager_column_completion:
+                    scoped_cols = self.populate_all_columns()
+                else:
+                    scoped_cols = self.populate_scoped_cols(tables)
+
                 if suggestion.get("drop_unique"):
                     # drop_unique is used for 'tb11 JOIN tbl2 USING (...'
                     # which should suggest only columns that appear in more than
@@ -1242,6 +1251,35 @@ class SQLCompleter(Completer):
                 pass
 
         return columns
+
+    def populate_all_columns(self) -> list[str]:
+        """Return all column names from all tables/views in the current database (deduplicated)."""
+        columns: list[str] = []
+        meta = self.dbmetadata
+        schema = self.dbname
+
+        if not schema:
+            return columns
+
+        # Collect columns from tables
+        if schema in meta["tables"]:
+            for table_columns in meta["tables"][schema].values():
+                columns.extend(table_columns)
+
+        # Collect columns from views
+        if schema in meta["views"]:
+            for view_columns in meta["views"][schema].values():
+                columns.extend(view_columns)
+
+        # Deduplicate while preserving order
+        seen = set()
+        unique_columns = []
+        for col in columns:
+            if col not in seen:
+                seen.add(col)
+                unique_columns.append(col)
+
+        return unique_columns
 
     def populate_enum_values(
         self,

@@ -25,7 +25,31 @@ metadata = {
 def completer():
     import mycli.sqlcompleter as sqlcompleter
 
-    comp = sqlcompleter.SQLCompleter(smart_completion=True)
+    # Disable eager_column_completion to preserve existing test behavior
+    comp = sqlcompleter.SQLCompleter(smart_completion=True, eager_column_completion=False)
+
+    tables, columns = [], []
+
+    for table, cols in metadata.items():
+        tables.append((table,))
+        columns.extend([(table, col) for col in cols])
+
+    comp.set_dbname("test")
+    comp.extend_schemata("test")
+    comp.extend_relations(tables, kind="tables")
+    comp.extend_columns(columns, kind="tables")
+    comp.extend_enum_values([("orders", "status", ["pending", "shipped"])])
+    comp.extend_special_commands(special.COMMANDS)
+
+    return comp
+
+
+@pytest.fixture
+def eager_completer():
+    """Completer with eager_column_completion enabled."""
+    import mycli.sqlcompleter as sqlcompleter
+
+    comp = sqlcompleter.SQLCompleter(smart_completion=True, eager_column_completion=True)
 
     tables, columns = [], []
 
@@ -589,3 +613,44 @@ def test_create_table_like_completion(completer, complete_event):
         'time_zone_leap_second',
         'time_zone_transition_type',
     ]
+
+
+def test_eager_column_completion_without_from(eager_completer, complete_event):
+    """Test that columns are suggested when SELECT is typed without FROM clause
+    and eager_column_completion is enabled."""
+    text = "SELECT "
+    position = len(text)
+    result = list(eager_completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+
+    # Extract completion texts
+    completion_texts = [c.text for c in result]
+
+    # All columns from all tables should be suggested
+    assert "id" in completion_texts
+    assert "email" in completion_texts
+    assert "first_name" in completion_texts
+    assert "ordered_date" in completion_texts
+    assert "status" in completion_texts
+
+
+def test_eager_column_completion_partial_match(eager_completer, complete_event):
+    """Test that column completion matches partial input without FROM clause."""
+    text = "SELECT em"
+    position = len(text)
+    result = list(eager_completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+
+    completion_texts = [c.text for c in result]
+    # "email" should be in the completions
+    assert "email" in completion_texts
+
+
+def test_eager_column_completion_disabled(completer, complete_event):
+    """Test that columns are NOT suggested without FROM clause when
+    eager_column_completion is disabled."""
+    text = "SELECT em"
+    position = len(text)
+    result = list(completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+
+    completion_texts = [c.text for c in result]
+    # "email" should NOT be in the completions when eager_column_completion=False
+    assert "email" not in completion_texts
