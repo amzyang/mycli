@@ -20,6 +20,17 @@ from mycli.packages.special.main import COMMANDS as SPECIAL_COMMANDS
 _logger = logging.getLogger(__name__)
 
 
+def _lowercase_processor(s: str) -> str:
+    """Lowercase only, preserve underscores and other separators.
+
+    Unlike rapidfuzz.utils.default_process which removes underscores,
+    this processor preserves them for better SQL identifier matching.
+    For example, 'book_id' and 'sentence_id' should not match just
+    because they both contain 'id'.
+    """
+    return s.lower() if isinstance(s, str) else ""
+
+
 class SQLCompleter(Completer):
     favorite_keywords = [
         'SELECT',
@@ -1021,9 +1032,7 @@ class SQLCompleter(Completer):
                     text,
                     collection,
                     scorer=rapidfuzz.fuzz.WRatio,
-                    # todo: maybe make our own processor which only does case-folding
-                    # because underscores are valuable info
-                    processor=rapidfuzz.utils.default_process,
+                    processor=_lowercase_processor,
                     limit=20,
                     score_cutoff=75,
                 )

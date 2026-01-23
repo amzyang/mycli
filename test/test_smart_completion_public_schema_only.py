@@ -462,11 +462,11 @@ def test_table_names_inter_partial(completer, complete_event):
     text = "SELECT * FROM time_leap"
     position = len("SELECT * FROM time_leap")
     result = list(completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+    # With underscore-preserving fuzzy matching, only tables containing both
+    # "time" and "leap" should match. Previously, rapidfuzz.utils.default_process
+    # removed underscores, causing overly broad matches.
     assert result == [
         Completion(text="time_zone_leap_second", start_position=-9),
-        Completion(text='time_zone_name', start_position=-9),
-        Completion(text='time_zone_transition', start_position=-9),
-        Completion(text='time_zone_transition_type', start_position=-9),
     ]
 
 
@@ -654,3 +654,26 @@ def test_eager_column_completion_disabled(completer, complete_event):
     completion_texts = [c.text for c in result]
     # "email" should NOT be in the completions when eager_column_completion=False
     assert "email" not in completion_texts
+
+
+def test_underscore_preserved_in_fuzzy_match():
+    """Test that underscores are preserved in fuzzy matching.
+
+    Previously, rapidfuzz.utils.default_process removed underscores,
+    causing 'book_id' to incorrectly match 'sentence_id' (both becoming
+    'bookid' and 'sentenceid', sharing 'id').
+
+    This test ensures that identifiers with different underscore-separated
+    parts are not incorrectly matched.
+    """
+    from mycli.sqlcompleter import SQLCompleter
+
+    matches = list(SQLCompleter.find_matches(
+        "book_id",
+        ["book_id", "sentence_id", "author_id"],
+        fuzzy=True,
+    ))
+    match_texts = [m.text for m in matches]
+    assert "book_id" in match_texts
+    assert "sentence_id" not in match_texts
+    assert "author_id" not in match_texts
