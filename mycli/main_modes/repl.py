@@ -33,7 +33,7 @@ from prompt_toolkit.formatted_text import (
     to_formatted_text,
     to_plain_text,
 )
-from prompt_toolkit.cursor_shapes import ModalCursorShapeConfig
+from prompt_toolkit.cursor_shapes import CursorShape, ModalCursorShapeConfig
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout.processors import (
     ConditionalProcessor,
@@ -101,6 +101,18 @@ if TYPE_CHECKING:
 SUPPORT_INFO = f"Home: {HOME_URL}\nBug tracker: {ISSUES_URL}"
 MIN_COMPLETION_TRIGGER = 1
 _PROMPT_TARGETS: dict[int, 'MyCli'] = {}
+
+
+class BlinkingCursorShapeConfig(ModalCursorShapeConfig):
+    _BLINK_MAP = {
+        CursorShape.BLOCK: CursorShape.BLINKING_BLOCK,
+        CursorShape.BEAM: CursorShape.BLINKING_BEAM,
+        CursorShape.UNDERLINE: CursorShape.BLINKING_UNDERLINE,
+    }
+
+    def get_cursor_shape(self, application):
+        shape = super().get_cursor_shape(application)
+        return self._BLINK_MAP.get(shape, shape)
 
 
 @dataclass(slots=True)
@@ -764,7 +776,7 @@ def _build_prompt_session(
             enable_suspend=True,
             editing_mode=editing_mode,
             search_ignore_case=True,
-            cursor=ModalCursorShapeConfig(),
+            cursor=BlinkingCursorShapeConfig(),
         )
 
         if mycli.key_bindings == 'vi':
