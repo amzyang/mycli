@@ -258,7 +258,9 @@ def run_from_cli_args(cli_args: 'CliArgs', client_factory: ClientFactory) -> Non
             cli_args.user = cli_args.user or login_config.get('user')
             cli_args.password = cli_args.password or login_config.get('password')
             cli_args.host = cli_args.host or login_config.get('host')
-            cli_args.port = cli_args.port or int(login_config.get('port'))
+            port_val = login_config.get('port')
+            if not cli_args.port and port_val:
+                cli_args.port = int(port_val)
             cli_args.socket = cli_args.socket or login_config.get('socket')
 
         if unknown_dsn_params := sorted(set(dsn_params) - KNOWN_DSN_QUERY_PARAMS):
