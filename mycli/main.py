@@ -1718,16 +1718,25 @@ def click_entrypoint(
         if params := dsn_params.get('login-path'):
             login_path_name = params[0]
             from mycli.config import read_login_path_config
+
             login_config = read_login_path_config(
                 login_path_name,
-                keys=['user', 'password', 'host', 'port', 'socket',]
+                keys=[
+                    'user',
+                    'password',
+                    'host',
+                    'port',
+                    'socket',
+                ],
             )
             # URI 参数优先，login-path 作为默认值
-            user = user or login_config.get('user')
-            password = password or login_config.get('password')
-            host = host or login_config.get('host')
-            port = port or int(login_config.get('port'))
-            socket = socket or login_config.get('socket')
+            cli_args.user = cli_args.user or login_config.get('user')
+            cli_args.password = cli_args.password or login_config.get('password')
+            cli_args.host = cli_args.host or login_config.get('host')
+            port_val = login_config.get('port')
+            if not cli_args.port and port_val:
+                cli_args.port = int(port_val)
+            cli_args.socket = cli_args.socket or login_config.get('socket')
 
         if params := dsn_params.get('ssl'):
             click.secho(
