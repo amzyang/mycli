@@ -183,6 +183,9 @@ class MyCli:
             special.set_show_warnings_enabled(show_warnings)
         else:
             special.set_show_warnings_enabled(c['main'].as_bool('show_warnings'))
+        special.set_ignore_warnings({
+            int(code.strip()) for code in c['main'].get('ignore_warnings', '').split(',') if code.strip()
+        })
         self.beep_after_seconds = float(c["main"]["beep_after_seconds"] or 0)
         self.default_keepalive_ticks = c['connection'].as_int('default_keepalive_ticks')
 
@@ -1083,6 +1086,9 @@ class MyCli:
             if special.is_show_warnings_enabled() and isinstance(result.rows, Cursor) and result.rows.warning_count > 0:
                 warnings = self.sqlexecute.run("SHOW WARNINGS")
                 for warning in warnings:
+                    warning = special.filter_ignored_warning(warning)
+                    if warning is None:
+                        continue
                     output = self.format_sqlresult(
                         warning,
                         is_expanded=special.is_expanded_output(),

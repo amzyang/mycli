@@ -433,6 +433,9 @@ def _output_results(
             warnings_duration = time.time() - start
             saw_warning = False
             for warning in warnings:
+                warning = special.filter_ignored_warning(warning)
+                if warning is None:
+                    continue
                 saw_warning = True
                 formatted = mycli.format_sqlresult(
                     warning,
