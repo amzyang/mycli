@@ -47,6 +47,7 @@ delimiter_command = DelimiterCommand()
 favoritequeries = FavoriteQueries(ConfigObj())
 DESTRUCTIVE_KEYWORDS: list[str] = []
 SHOW_WARNINGS_ENABLED: bool = False
+IGNORE_WARNINGS: set[int] = set()
 
 
 def set_favorite_queries(config):
@@ -89,6 +90,25 @@ def set_show_warnings_enabled(val: bool) -> None:
 
 def is_show_warnings_enabled() -> bool:
     return SHOW_WARNINGS_ENABLED
+
+
+def set_ignore_warnings(codes: set[int]) -> None:
+    global IGNORE_WARNINGS
+    IGNORE_WARNINGS = set(codes)
+
+
+def filter_ignored_warning(result: SQLResult) -> SQLResult | None:
+    """Drop ignored warning codes from a SHOW WARNINGS result.
+
+    Returns None when every row is filtered out so callers can skip the result entirely.
+    """
+    if not IGNORE_WARNINGS:
+        return result
+    rows = [row for row in result.rows if row[1] not in IGNORE_WARNINGS]
+    if not rows:
+        return None
+    result.rows = rows
+    return result
 
 
 @special_command(
