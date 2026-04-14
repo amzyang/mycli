@@ -11,11 +11,11 @@ from prompt_toolkit.filters import (
     control_is_searchable,
     emacs_mode,
 )
+from prompt_toolkit.filters.cli import ViInsertMode
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.named_commands import register as ptoolkit_register
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.selection import SelectionType
-from prompt_toolkit.filters.cli import ViInsertMode
 
 from mycli.constants import DOCS_URL
 from mycli.packages import key_binding_utils
