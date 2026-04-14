@@ -21,6 +21,7 @@ import prompt_toolkit
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory, ThreadedAutoSuggest
 from prompt_toolkit.completion import DynamicCompleter
+from prompt_toolkit.cursor_shapes import CursorShape, ModalCursorShapeConfig
 from prompt_toolkit.enums import DEFAULT_BUFFER, EditingMode
 from prompt_toolkit.filters import Condition, has_focus, is_done
 from prompt_toolkit.formatted_text import (
@@ -30,7 +31,6 @@ from prompt_toolkit.formatted_text import (
     to_formatted_text,
     to_plain_text,
 )
-from prompt_toolkit.cursor_shapes import CursorShape, ModalCursorShapeConfig
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout.processors import ConditionalProcessor, HighlightMatchingBracketProcessor
 from prompt_toolkit.lexers import PygmentsLexer
@@ -498,12 +498,12 @@ def _output_results(
             warnings_duration = time.time() - start
             saw_warning = False
             for warning in warnings:
-                warning = special.filter_ignored_warning(warning)
-                if warning is None:
+                filtered = special.filter_ignored_warning(warning)
+                if filtered is None:
                     continue
                 saw_warning = True
                 formatted = mycli.format_sqlresult(
-                    warning,
+                    filtered,
                     is_expanded=special.is_expanded_output(),
                     is_redirected=special.is_redirected(),
                     null_string=mycli.null_string,
@@ -513,7 +513,7 @@ def _output_results(
                     is_warnings_style=True,
                 )
                 mycli.echo('')
-                mycli.output(formatted, warning, is_warnings_style=True)
+                mycli.output(formatted, filtered, is_warnings_style=True)
 
             if saw_warning and special.is_timing_enabled():
                 mycli.output_timing(f'Time: {warnings_duration:0.03f}s', is_warnings_style=True)
