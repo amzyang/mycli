@@ -134,6 +134,20 @@ def test_where_equals_suggests_enum_values_first():
     ])
 
 
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "SELECT * FROM tabl WHERE id=2",  # no spaces: was wrongly suggesting columns
+        "SELECT * FROM tabl WHERE id = 2",  # spaced form: already correct, pin the boundary
+        "SELECT * FROM tabl WHERE t.col>=3.5",
+        "SELECT * FROM tabl WHERE id=-2",  # no spaces: negative literal glued to "id="
+        "SELECT * FROM tabl WHERE id = -2",  # spaced negative literal: word_before_cursor is just "-2"
+    ],
+)
+def test_where_typed_number_literal_suggests_nothing(expression):
+    assert suggest_type(expression, expression) == []
+
+
 def test_enum_value_suggestion_returns_none_without_equals_context():
     expression = 'SELECT * FROM tabl WHERE foo'
     suggestion = _enum_value_suggestion(expression, expression)
@@ -308,6 +322,18 @@ def test_aliases_prefers_alias_and_falls_back_to_table_name():
         ('.foo', True),
         ('foo', False),
         (None, False),
+        # `many_punctuations` glues "<lhs><op>" onto the typed literal when
+        # there are no surrounding spaces; the guard must see past it.
+        ('id=2', True),
+        ('t.col>=3.5', True),
+        ('id=-2', True),
+        # spaced "id = -2": no operator in the word, but the negative sign
+        # must still be seen past -- behavior change vs. the old [0]-only check.
+        ('-2', True),
+        ('id<>.5', True),
+        ('id=col', False),
+        ('id=', False),
+        ('b.', False),
     ],
 )
 def test_word_starts_with_digit_or_dot(word_before_cursor, expected):
