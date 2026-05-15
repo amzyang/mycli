@@ -18,6 +18,15 @@ _ENUM_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Symbolic comparison / JSON-extraction operators that `many_punctuations`
+# (sql_utils.cleanup_regex) does NOT split on, so they get glued into a single
+# word_before_cursor like "col=2". Multi-char operators come first so the
+# alternation doesn't mis-split "<=" into "<". Arithmetic operators are
+# intentionally excluded to avoid suppressing suggestions in expressions.
+# `:=` is deliberately omitted: `many_punctuations` excludes ":" so it is
+# already a word boundary, and the trailing "=<rhs>" is matched by "=" here.
+_COMPARISON_OP_RE = re.compile(r"(?:<=>|<>|!=|<=|>=|->>|->|=|<|>)")
+
 # missing because not binary
 #   BETWEEN
 #   CASE
@@ -380,8 +389,20 @@ def _emit_binary_or_comma(ctx: SuggestContext) -> list[Suggestion]:
     return fallback
 
 
+def _strip_leading_comparison_ops(word: str | None) -> str | None:
+    """`many_punctuations` keeps "col=2" as a single word. Return the segment
+    the user is actually typing -- everything after the last comparison
+    operator -- so a literal can be recognized even with no surrounding
+    spaces. Return `word` unchanged when there is no comparison operator."""
+    if not word:
+        return word
+    ops = list(_COMPARISON_OP_RE.finditer(word))
+    return word[ops[-1].end() :] if ops else word
+
+
 def _word_starts_with_digit_or_dot(ctx: SuggestContext) -> bool:
-    return bool(ctx.word_before_cursor and re.match(r'^[\d\.]', ctx.word_before_cursor[0]))
+    token = _strip_leading_comparison_ops(ctx.word_before_cursor)
+    return bool(token and re.match(r'^[+-]?[\d.]', token))
 
 
 def _word_starts_with_quote(ctx: SuggestContext) -> bool:
