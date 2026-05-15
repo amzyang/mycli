@@ -16,6 +16,7 @@ from prompt_toolkit.filters.cli import ViInsertMode
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.named_commands import register as ptoolkit_register
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+from prompt_toolkit.key_binding.vi_state import InputMode
 from prompt_toolkit.selection import SelectionType
 
 from mycli.constants import DOCS_URL
@@ -166,13 +167,31 @@ def mycli_bindings(mycli) -> KeyBindings:
 
     @kb.add("escape", eager=vi_mode, filter=in_completion)
     def _(event: KeyPressEvent) -> None:
-        """Cancel completion menu.
+        """Cancel the completion menu, and in vi mode also go straight to
+        navigation mode in the same keypress.
+
+        By default this binding only cancels the completion menu (because it
+        is ``eager`` and preempts prompt_toolkit's vi escape -> navigation
+        binding), which forces a second Escape to leave insert mode. Mirroring
+        prompt_toolkit's ``_back_to_navigation`` here makes a single Escape
+        both close the popup and enter normal mode.
 
         There will be a lag when canceling Escape due to the processing of
         Alt- keystrokes as Escape- sequences.
 
         There will be no lag when using control-g to cancel."""
-        event.app.current_buffer.cancel_completion()
+        buffer = event.app.current_buffer
+        buffer.cancel_completion()
+
+        if event.app.editing_mode != EditingMode.VI:
+            return
+
+        vi_state = event.app.vi_state
+        if vi_state.input_mode in (InputMode.INSERT, InputMode.REPLACE):
+            buffer.cursor_position += buffer.document.get_cursor_left_position()
+        vi_state.input_mode = InputMode.NAVIGATION
+        if bool(buffer.selection_state):
+            buffer.exit_selection()
 
     @kb.add("c-space")
     def _(event: KeyPressEvent) -> None:
