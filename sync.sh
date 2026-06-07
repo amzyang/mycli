@@ -19,9 +19,15 @@ end
 
 git rebase upstream/main
 if test $status -ne 0
-    echo "Error: rebase failed, aborting..."
-    git rebase --abort
-    exit 1
+    echo "Rebase hit conflicts, invoking Claude to resolve..."
+    claude -p --dangerously-skip-permissions "/goal A rebase onto upstream/main is in progress and paused on conflicts. Resolve the conflicts and run git rebase --continue, repeating until the rebase is complete."
+
+    # verify the rebase actually completed before pushing
+    if test -d (git rev-parse --git-dir)/rebase-merge; or test -d (git rev-parse --git-dir)/rebase-apply
+        echo "Error: rebase still in progress after Claude, aborting..."
+        git rebase --abort
+        exit 1
+    end
 end
 
 git push --force-with-lease; or exit 1
