@@ -6,7 +6,11 @@ from mycli.packages.special_commands.db_commands import (
     ping,
     status,
 )
-from mycli.packages.special_commands.io_commands import (
+from mycli.packages.special_commands.grepcommands import (
+    grep_data,
+    grep_schema,
+)
+from mycli.packages.special_commands.iocommands import (
     clip_command,
     close_tee,
     copy_query_to_clipboard,
@@ -103,6 +107,8 @@ __all__: list[str] = [
     'get_current_delimiter',
     'get_editor_query',
     'get_filename',
+    'grep_data',
+    'grep_schema',
     'handle_llm',
     'is_expanded_output',
     'is_explorer_output',
