@@ -3,8 +3,10 @@
 Two standalone special commands inspired by DataGrip:
 
 * ``\\grep``  — search table/column names and column comments (information_schema).
-* ``\\dgrep`` — search the data in every text column of the current database,
-  the CLI equivalent of DataGrip's "Find in database / Full-text search".
+* ``\\dgrep`` — search the data in the current database, the CLI equivalent of
+  DataGrip's "Find in database / Full-text search". By default only text columns
+  are scanned; ``-n`` also scans numeric columns and ``-a`` additionally scans
+  date/time and JSON columns (non-text columns are matched via ``CAST(col AS CHAR)``).
 
 Kept in its own module so the feature stays isolated from the upstream
 ``dbcommands.py``; registration happens via the import in
@@ -24,12 +26,33 @@ from mycli.packages.sqlresult import SQLResult
 logger = logging.getLogger(__name__)
 
 # DataGrip's "Text columns" set: string types that support a plain LIKE.
-# JSON is intentionally excluded (DataGrip puts it under "All columns", which needs CAST).
 GREP_TEXT_DATA_TYPES = ('char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', 'enum', 'set')
+# Non-text types worth searching via CAST(col AS CHAR). binary/blob/bit/spatial are intentionally
+# excluded: CAST(blob AS CHAR) can raise on invalid utf8 and CAST(geometry AS CHAR) is rejected
+# outright, and a single failing column would fail the whole table's OR query.
+GREP_NUMERIC_DATA_TYPES = ('tinyint', 'smallint', 'mediumint', 'int', 'bigint', 'decimal', 'float', 'double')
+GREP_TEMPORAL_DATA_TYPES = ('date', 'datetime', 'timestamp', 'time', 'year')
+GREP_JSON_DATA_TYPES = ('json',)
+
+# arg prefix flag -> the DATA_TYPE set that flag widens the scan to. information_schema reports
+# DATA_TYPE as the lowercase base type (int, varchar, datetime), so an exact-match set suffices.
+GREP_SCOPE_FLAGS = {
+    '-n': GREP_TEXT_DATA_TYPES + GREP_NUMERIC_DATA_TYPES,
+    '-a': GREP_TEXT_DATA_TYPES + GREP_NUMERIC_DATA_TYPES + GREP_TEMPORAL_DATA_TYPES + GREP_JSON_DATA_TYPES,
+}
 
 
 def _quote_identifier(name: str) -> str:
     return '`' + name.replace('`', '``') + '`'
+
+
+def _column_predicate(col: str, data_type: str) -> str:
+    # Text columns keep a plain LIKE so the column's own (usually case-insensitive) collation
+    # drives matching; everything else is cast to CHAR for a substring match.
+    ident = _quote_identifier(col)
+    if data_type in GREP_TEXT_DATA_TYPES:
+        return f"{ident} LIKE %s"
+    return f"CAST({ident} AS CHAR) LIKE %s"
 
 
 @special_command(
@@ -87,8 +110,10 @@ def grep_schema(
 
 @special_command(
     "\\dgrep",
-    "\\dgrep[+] <pattern>",
-    "Search every text column of the current database for a substring. '+' removes the per-table row limit.",
+    "\\dgrep[+] [-n|-a] <pattern>",
+    "Search the current database's data for a substring. Default: text columns; "
+    "-n also scans numeric columns, -a also scans date/time and JSON columns. "
+    "'+' removes the per-table row limit.",
     arg_type=ArgType.PARSED_QUERY,
     case_sensitive=True,
 )
@@ -99,7 +124,17 @@ def grep_data(
     **_: object,
 ) -> list[SQLResult]:
     if not arg:
-        return [SQLResult(status="Usage: \\dgrep[+] <pattern>")]
+        return [SQLResult(status="Usage: \\dgrep[+] [-n|-a] <pattern>")]
+
+    # A leading -n/-a widens the scanned column types. Only an exact -n/-a token counts as a flag,
+    # so patterns like '-5' are searched literally (at the cost of not matching a literal '-n ...').
+    scope_types: tuple[str, ...] = GREP_TEXT_DATA_TYPES
+    first, _sep, rest = arg.partition(' ')
+    if first in GREP_SCOPE_FLAGS:
+        scope_types = GREP_SCOPE_FLAGS[first]
+        arg = rest.strip()
+    if not arg:
+        return [SQLResult(status="Usage: \\dgrep[+] [-n|-a] <pattern>")]
 
     cur.execute("SELECT DATABASE()")
     row = cur.fetchone()
@@ -107,27 +142,27 @@ def grep_data(
     if not dbname:
         return [SQLResult(status="No database selected. Use \\u <db> first.")]
 
-    placeholders = ', '.join(['%s'] * len(GREP_TEXT_DATA_TYPES))
+    placeholders = ', '.join(['%s'] * len(scope_types))
     columns_query = (
-        "SELECT TABLE_NAME, COLUMN_NAME "
+        "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE "
         "FROM information_schema.columns "
         f"WHERE TABLE_SCHEMA = %s AND DATA_TYPE IN ({placeholders}) "
         "ORDER BY TABLE_NAME, ORDINAL_POSITION"
     )
     logger.debug(columns_query)
-    cur.execute(columns_query, (dbname, *GREP_TEXT_DATA_TYPES))
-    # Only tables that have at least one text column show up here — the natural,
+    cur.execute(columns_query, (dbname, *scope_types))
+    # Only tables that have at least one in-scope column show up here — the natural,
     # correctness-safe pruning (no unreliable TABLE_ROWS guessing).
-    columns_by_table: dict[str, list[str]] = {}
-    for table_name, column_name in cur.fetchall():
-        columns_by_table.setdefault(table_name, []).append(column_name)
+    columns_by_table: dict[str, list[tuple[str, str]]] = {}
+    for table_name, column_name, data_type in cur.fetchall():
+        columns_by_table.setdefault(table_name, []).append((column_name, data_type))
 
     pattern = f"%{arg}%"
     limit_clause = '' if command_verbosity else ' LIMIT 100'
 
     results: list[SQLResult] = []
     for table_name, columns in columns_by_table.items():
-        where = ' OR '.join(f"{_quote_identifier(col)} LIKE %s" for col in columns)
+        where = ' OR '.join(_column_predicate(col, dtype) for col, dtype in columns)
         query = f"SELECT * FROM {_quote_identifier(table_name)} WHERE {where}{limit_clause}"
         logger.debug(query)
         try:
