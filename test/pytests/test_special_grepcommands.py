@@ -2,7 +2,12 @@
 
 from pymysql import ProgrammingError
 
-from mycli.packages.special.grepcommands import grep_data, grep_schema
+from mycli.packages.special.grepcommands import (
+    GREP_NUMERIC_DATA_TYPES,
+    GREP_TEXT_DATA_TYPES,
+    grep_data,
+    grep_schema,
+)
 
 
 class SequenceCursor:
@@ -100,7 +105,7 @@ def test_grep_schema_requires_pattern():
 def test_grep_data_groups_matches_by_table_and_limits():
     cur = SequenceCursor([
         {'rows': [('app',)]},  # SELECT DATABASE()
-        {'rows': [('users', 'name'), ('users', 'email'), ('orders', 'note')]},  # text columns
+        {'rows': [('users', 'name', 'varchar'), ('users', 'email', 'varchar'), ('orders', 'note', 'text')]},  # columns
         {  # users matches
             'description': [('id',), ('name',), ('email',)],
             'rows': [(1, 'Alice', 'a@x'), (2, 'alice2', 'b@x')],
@@ -128,7 +133,7 @@ def test_grep_data_groups_matches_by_table_and_limits():
 def test_grep_data_verbose_removes_limit():
     cur = SequenceCursor([
         {'rows': [('app',)]},
-        {'rows': [('users', 'name')]},
+        {'rows': [('users', 'name', 'varchar')]},
         {'description': [('id',), ('name',)], 'rows': [(1, 'Alice')]},
     ])
 
@@ -142,7 +147,7 @@ def test_grep_data_verbose_removes_limit():
 def test_grep_data_skips_unreadable_tables():
     cur = SequenceCursor([
         {'rows': [('app',)]},
-        {'rows': [('broken_view', 'col'), ('users', 'name')]},
+        {'rows': [('broken_view', 'col', 'varchar'), ('users', 'name', 'varchar')]},
         {'raise': ProgrammingError()},  # broken_view fails — should be skipped
         {'description': [('id',), ('name',)], 'rows': [(1, 'Alice')]},  # users matches
     ])
@@ -163,7 +168,7 @@ def test_grep_data_without_database_returns_status():
 def test_grep_data_no_matches_returns_status():
     cur = SequenceCursor([
         {'rows': [('app',)]},
-        {'rows': [('users', 'name')]},
+        {'rows': [('users', 'name', 'varchar')]},
         {'description': [('id',), ('name',)], 'rows': []},
     ])
     results = grep_data(cur, arg='zzz')
@@ -173,5 +178,56 @@ def test_grep_data_no_matches_returns_status():
 def test_grep_data_requires_pattern():
     cur = SequenceCursor([])
     results = grep_data(cur, arg='')
+    assert results[0].status.startswith('Usage:')
+    assert cur.executed == []
+
+
+def test_grep_data_default_scope_queries_text_types_only():
+    cur = SequenceCursor([
+        {'rows': [('app',)]},
+        {'rows': []},  # no in-scope columns
+    ])
+    grep_data(cur, arg='ali')
+    _, columns_args = cur.executed[1]
+    assert columns_args == ('app', *GREP_TEXT_DATA_TYPES)
+
+
+def test_grep_data_numeric_flag_casts_numeric_columns():
+    cur = SequenceCursor([
+        {'rows': [('app',)]},  # SELECT DATABASE()
+        {'rows': [('events', 'id', 'int'), ('events', 'code', 'varchar')]},  # columns in -n scope
+        {'description': [('id',), ('code',)], 'rows': [(100, 'x')]},
+    ])
+
+    results = grep_data(cur, arg='-n 100')
+
+    # The -n flag is stripped from the pattern and widens the column scope to numeric types.
+    _, columns_args = cur.executed[1]
+    assert columns_args == ('app', *(GREP_TEXT_DATA_TYPES + GREP_NUMERIC_DATA_TYPES))
+    events_sql, events_args = cur.executed[2]
+    assert events_sql == 'SELECT * FROM `events` WHERE CAST(`id` AS CHAR) LIKE %s OR `code` LIKE %s LIMIT 100'
+    assert events_args == ('%100%', '%100%')
+    assert results[0].preamble == 'events (1)'
+
+
+def test_grep_data_all_flag_casts_temporal_and_json():
+    cur = SequenceCursor([
+        {'rows': [('app',)]},
+        {'rows': [('events', 'note', 'text'), ('events', 'created_at', 'datetime'), ('events', 'meta', 'json')]},
+        {'description': [('note',), ('created_at',), ('meta',)], 'rows': [('x', '2026-06-16', '{}')]},
+    ])
+
+    grep_data(cur, arg='-a 2026-06')
+
+    events_sql, events_args = cur.executed[2]
+    assert events_sql == (
+        'SELECT * FROM `events` WHERE `note` LIKE %s OR CAST(`created_at` AS CHAR) LIKE %s OR CAST(`meta` AS CHAR) LIKE %s LIMIT 100'
+    )
+    assert events_args == ('%2026-06%', '%2026-06%', '%2026-06%')
+
+
+def test_grep_data_flag_without_pattern_returns_usage():
+    cur = SequenceCursor([])
+    results = grep_data(cur, arg='-n')
     assert results[0].status.startswith('Usage:')
     assert cur.executed == []
