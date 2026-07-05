@@ -336,6 +336,29 @@ def render_prompt_string(
         short_prompt_host = prompt_host
     now = datetime.now()
     species_name = sql_execute.server_info.species.name if sql_execute.server_info and sql_execute.server_info.species else 'MySQL'
+    species_name = sql_execute.server_info.species.name if sql_execute.server_info and sql_execute.server_info.species else 'MySQL'
+
+    # Conditional groups: \[...\] is dropped entirely when any optional
+    # placeholder inside has no underlying value; otherwise the brackets are
+    # stripped and the content rendered normally.  Only placeholders whose
+    # value may be absent without querying the server participate.
+    optional_values = {
+        'u': sql_execute.user,
+        'd': sql_execute.dbname,
+        'j': sql_execute.socket,
+        'J': sql_execute.socket,
+        'A': mycli.dsn_alias,
+    }
+
+    def render_conditional_group(match: 're.Match[str]') -> str:
+        content = match.group(1)
+        keys = re.findall(r'\\(.)', content)
+        if any(key in optional_values and not optional_values[key] for key in keys):
+            return ''
+        return content
+
+    string = re.sub(r'\\\[(.*?)\\\]', render_conditional_group, string)
+
     strings = string.split('\\\\')
     is_html = strings[0].startswith('\\<html>')
     strings = [x.replace('\\u', maybe_html_escape(sql_execute.user or '(none)', is_html)) for x in strings]
