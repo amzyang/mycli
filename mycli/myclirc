@@ -154,6 +154,11 @@ wider_completion_menu = False
 #   Characters such as "&" or literal "<" and ">" must be HTML-escaped in this mode.
 #   HTML styles cannot be combined with ANSI sequences.  HTML mode takes precedence.
 #   HTML color example: prompt = '\<html><red><u>root</u></red>@localhost:\d&gt; '
+# * \[...\] - a conditional group, hidden entirely (including any literal text
+#   inside) when any of \u, \d, \j, \J or \A within it has no value; other
+#   placeholders never hide the group.  Nesting is not supported.
+#   Example: prompt = '\[\A \]\u@\h\[:\d\]> ' hides the DSN alias and the
+#   ":database" part until they exist, instead of showing "(none)".
 #
 prompt = '\t \u@\h:\d> '
 prompt_continuation = '->'

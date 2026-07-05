@@ -674,6 +674,57 @@ def test_render_prompt_string_ansi() -> None:
     assert to_plain_text(ansi_prompt) == 'red'
 
 
+def test_render_prompt_string_conditional_group() -> None:
+    repl_mode.render_prompt_string.cache_clear()
+
+    def make_cli(dbname: str | None = 'db', dsn_alias: str | None = None) -> Any:
+        cli = make_repl_cli(
+            SimpleNamespace(
+                user='alice',
+                host='127.0.0.1',
+                dbname=dbname,
+                port=3306,
+                socket=None,
+                server_info=SimpleNamespace(species=SimpleNamespace(name='MySQL')),
+                conn=None,
+            )
+        )
+        cli.dsn_alias = dsn_alias
+        return cli
+
+    cli = make_cli(dsn_alias='dsn')
+    prompt = repl_mode.render_prompt_string(cli, r'❯ \[\A \]\u', 0)
+    assert to_plain_text(prompt) == '❯ dsn alice'
+
+    cli = make_cli(dsn_alias=None)
+    prompt = repl_mode.render_prompt_string(cli, r'❯ \[\A \]\u', 0)
+    assert to_plain_text(prompt) == '❯ alice'
+
+    cli = make_cli(dbname=None)
+    prompt = repl_mode.render_prompt_string(cli, r'\h\[:\d\]', 0)
+    assert to_plain_text(prompt) == '127.0.0.1'
+
+    cli = make_cli(dbname='db')
+    prompt = repl_mode.render_prompt_string(cli, r'\h\[:\d\]', 0)
+    assert to_plain_text(prompt) == '127.0.0.1:db'
+
+    cli = make_cli()
+    prompt = repl_mode.render_prompt_string(cli, r'\[\t \]\u', 0)
+    assert to_plain_text(prompt) == 'MySQL alice'
+
+    cli = make_cli()
+    prompt = repl_mode.render_prompt_string(cli, r'\[literal\]\u', 0)
+    assert to_plain_text(prompt) == 'literalalice'
+
+    cli = make_cli()
+    prompt = repl_mode.render_prompt_string(cli, r'\[\u', 0)
+    assert to_plain_text(prompt) == r'(unknown prompt format string: \[)alice'
+
+    cli = make_cli(dsn_alias=None)
+    html_prompt = repl_mode.render_prompt_string(cli, r'\<html><b>\[\A \]\u</b>\</html>', 0)
+    assert to_plain_text(html_prompt) == 'alice'
+
+
 def test_output_results_covers_watch_warning_timing_beep_and_interrupts(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeSQLExecute:
         def run(self, text: str) -> list[SQLResult]:

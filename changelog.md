@@ -120,6 +120,7 @@ Features
 * Add `--ssh-jump` CLI argument, restoring SSH jump functionality.
 * Add a `/dsn` command to manage persisted DSN aliases.
 * Add `auto` option to ignore keyring when inside an SSH session.
+* Add conditional prompt groups: `\[...\]` hides the whole group when `\u`, `\d`, `\j`, `\J` or `\A` inside it has no value, instead of showing `(none)`.
 
 
 Documentation
