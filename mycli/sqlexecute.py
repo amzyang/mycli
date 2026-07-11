@@ -104,7 +104,7 @@ class SQLExecute:
 
     collations_query = '''SHOW COLLATION'''
 
-    table_columns_query = """select TABLE_NAME, COLUMN_NAME from information_schema.columns
+    table_columns_query = """select TABLE_NAME, COLUMN_NAME, COLUMN_COMMENT from information_schema.columns
                                     where table_schema = %s
                                     order by table_name,ordinal_position"""
 
@@ -114,6 +114,10 @@ class SQLExecute:
                                       AND SEQ_IN_INDEX = 1
                                       AND COLUMN_NAME IS NOT NULL
                                     ORDER BY TABLE_NAME, COLUMN_NAME"""
+
+    table_comments_query = """select TABLE_NAME, TABLE_COMMENT from information_schema.tables
+                                    where table_schema = %s
+                                    and TABLE_TYPE = 'BASE TABLE' and TABLE_COMMENT <> ''"""
 
     enum_values_query = """select TABLE_NAME, COLUMN_NAME, COLUMN_TYPE from information_schema.columns
                                     where table_schema = %s and data_type = 'enum'
@@ -437,8 +441,8 @@ class SQLExecute:
             cur.execute(self.tables_query)
             yield from cur
 
-    def table_columns(self, schema: str | None = None) -> Generator[tuple[str, str], None, None]:
-        """Yields (table name, column name) pairs for *schema* (default: current database)."""
+    def table_columns(self, schema: str | None = None) -> Generator[tuple[str, str, str], None, None]:
+        """Yields (table name, column name, column comment) tuples for *schema* (default: current database)."""
         target = schema if schema is not None else self.dbname
         assert isinstance(self.conn, Connection)
         with self.conn.cursor() as cur:
@@ -457,6 +461,18 @@ class SQLExecute:
                 yield from cur
             except Exception as e:
                 _logger.error('No indexed-column metadata due to %r', e)
+
+    def table_comments(self, schema: str | None = None) -> Generator[tuple[str, str], None, None]:
+        """Yields (table name, table comment) pairs for tables with a non-empty comment."""
+        target = schema if schema is not None else self.dbname
+        assert isinstance(self.conn, Connection)
+        with self.conn.cursor() as cur:
+            _logger.debug("Table Comments Query. sql: %r schema: %r", self.table_comments_query, target)
+            try:
+                cur.execute(self.table_comments_query, (target,))
+                yield from cur
+            except Exception as e:
+                _logger.error('No table comment completions due to %r', e)
 
     def enum_values(self, schema: str | None = None) -> Generator[tuple[str, str, list[str]], None, None]:
         """Yields (table name, column name, enum values) tuples for *schema*."""
