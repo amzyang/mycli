@@ -336,7 +336,6 @@ def render_prompt_string(
         short_prompt_host = prompt_host
     now = datetime.now()
     species_name = sql_execute.server_info.species.name if sql_execute.server_info and sql_execute.server_info.species else 'MySQL'
-    species_name = sql_execute.server_info.species.name if sql_execute.server_info and sql_execute.server_info.species else 'MySQL'
 
     # Conditional groups: \[...\] is dropped entirely when any optional
     # placeholder inside has no underlying value; otherwise the brackets are
