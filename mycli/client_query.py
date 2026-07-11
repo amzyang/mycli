@@ -22,6 +22,7 @@ class ClientQueryMixin:
         completer: Any
         completion_refresher: Any
         smart_completion: bool
+        show_completion_meta: bool
         main_formatter: Any
         redirect_formatter: Any
         explorer_formatter: Any
@@ -66,6 +67,7 @@ class ClientQueryMixin:
                 'rapidfuzz_length_coverage': self.completer.rapidfuzz_length_coverage,
                 'rapidfuzz_score_cutoff': self.completer.rapidfuzz_score_cutoff,
                 'regex_match_distance': self.completer.regex_match_distance,
+                "show_completion_meta": self.show_completion_meta,
             },
         )
 
