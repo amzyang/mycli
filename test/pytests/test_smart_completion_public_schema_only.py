@@ -107,6 +107,13 @@ def test_special_name_completion(completer, complete_event):
     assert list(result) == [
         Completion(text="\\dt", start_position=-2, display_meta='list or describe tables'),
         Completion(text="\\dsn", start_position=-2, display_meta='manage saved DSNs'),
+        Completion(
+            text="\\dgrep",
+            start_position=-2,
+            display_meta="Search the current database's data for a substring. Default: text columns; "
+            "-n also scans numeric columns, -a also scans date/time and JSON columns. "
+            "'+' removes the per-table row limit.",
+        ),
     ]
 
 
