@@ -38,6 +38,7 @@ def make_refresh_cli() -> tuple[Any, dict[str, Any]]:
         refresh=lambda executor, callbacks, options: state['refresh_calls'].append((executor, callbacks, options)),
     )
     cli.smart_completion = True
+    cli.show_completion_meta = True
     state['callback'] = callback
     return cli, state
 
@@ -74,6 +75,7 @@ def test_refresh_completions_passes_options_to_refresher() -> None:
                 'indexed_column_suffix': ' [indexed]',
                 'config_property_names': ('main.show_warnings',),
                 'frecency_provider': cli.completer.frecency_provider,
+                'show_completion_meta': True,
             },
         )
     ]
@@ -110,6 +112,7 @@ def test_refresh_completions_updates_dbname_when_reset() -> None:
     )
     cli.main_formatter = SimpleNamespace(supported_formats=['table'])
     cli.completion_refresher = SimpleNamespace(stop=lambda: None, refresh=lambda executor, callbacks, options: None)
+    cli.show_completion_meta = True
 
     main.MyCli.refresh_completions(cli, reset=True)
 
@@ -131,6 +134,7 @@ def test_refresh_completions_uses_lock_when_reset() -> None:
     )
     cli.main_formatter = SimpleNamespace(supported_formats=['table'])
     cli.completion_refresher = SimpleNamespace(stop=lambda: None, refresh=lambda executor, callbacks, options: None)
+    cli.show_completion_meta = True
 
     main.MyCli.refresh_completions(cli, reset=True)
 

@@ -22,6 +22,7 @@ class ClientQueryMixin:
         completer: Any
         completion_refresher: Any
         smart_completion: bool
+        show_completion_meta: bool
         main_formatter: Any
         redirect_formatter: Any
         explorer_formatter: Any
@@ -60,6 +61,7 @@ class ClientQueryMixin:
                 "indexed_column_suffix": self.completer.indexed_column_suffix,
                 "config_property_names": self.completer.config_property_names,
                 'frecency_provider': self.completer.frecency_provider,
+                "show_completion_meta": self.show_completion_meta,
             },
         )
 
