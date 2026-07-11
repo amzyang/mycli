@@ -174,6 +174,7 @@ class SchemaPrefetcher:
     def _prefetch_one(self, executor: SQLExecute, schema: str) -> None:
         _logger.debug('prefetching schema %r', schema)
         table_rows = list(executor.table_columns(schema=schema))
+        table_comment_rows = list(executor.table_comments(schema=schema))
         fk_rows = list(executor.foreign_keys(schema=schema))
         enum_rows = list(executor.enum_values(schema=schema))
         func_rows = list(executor.functions(schema=schema))
@@ -183,11 +184,22 @@ class SchemaPrefetcher:
         # completion engine computes when parsing user input.
         completer = self.mycli.completer
         table_columns: dict[str, list[str]] = {}
-        for table, column in table_rows:
+        column_comments: dict[str, dict[str, str]] = {}
+        for table, column, comment in table_rows:
             esc_table = completer.escape_name(table)
             esc_col = completer.escape_name(column)
             cols = table_columns.setdefault(esc_table, ['*'])
             cols.append(esc_col)
+            cleaned = completer.clean_comment(comment) if completer.show_completion_meta else None
+            if cleaned:
+                column_comments.setdefault(esc_table, {})[esc_col] = cleaned
+
+        table_comments: dict[str, str] = {}
+        if completer.show_completion_meta:
+            for table, comment in table_comment_rows:
+                cleaned = completer.clean_comment(comment)
+                if cleaned and cleaned != 'VIEW':
+                    table_comments[completer.escape_name(table)] = cleaned
 
         fk_tables: dict[str, set[str]] = {}
         fk_relations: list[tuple[str, str, str, str]] = []
@@ -228,6 +240,8 @@ class SchemaPrefetcher:
                 enum_values=enum_values,
                 functions=functions,
                 procedures=procedures,
+                table_comments=table_comments,
+                column_comments=column_comments,
             )
         self._invalidate_app()
 

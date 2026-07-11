@@ -184,8 +184,12 @@ class MyCli(AppStateMixin, OutputMixin, ClientCommandsMixin, ClientConnectionMix
 
         # Initialize completer.
         self.smart_completion = c["main"].as_bool("smart_completion")
+        self.show_completion_meta = c["main"].as_bool("show_completion_meta")
         self.completer = SQLCompleter(
-            self.smart_completion, supported_formats=self.main_formatter.supported_formats, keyword_casing=keyword_casing
+            self.smart_completion,
+            supported_formats=self.main_formatter.supported_formats,
+            keyword_casing=keyword_casing,
+            show_completion_meta=self.show_completion_meta,
         )
         self._completer_lock = threading.Lock()
 

@@ -406,13 +406,89 @@ def test_extend_metadata_helpers_and_logging(caplog) -> None:
 
     caplog.clear()
     with caplog.at_level('ERROR', logger='mycli.sqlcompleter'):
-        completer.extend_columns([('missing', 'id'), ('select', 'from')], kind='tables')
+        completer.extend_columns([('missing', 'id'), ('select', 'from', 'reserved column')], kind='tables')
     assert "relname 'missing' was not found in db 'test'" in caplog.text
     assert completer.dbmetadata['tables']['test']['`select`'] == ['*', '`from`']
+    assert completer.column_comments['test']['`select`']['`from`'] == 'reserved column'
 
     completer.set_dbname('enumdb')
     completer.extend_enum_values([('order status', 'select', ['pending'])])
     assert completer.dbmetadata['enum_values']['enumdb']['`order status`']['`select`'] == ['pending']
+
+
+def test_clean_comment_normalizes_and_truncates() -> None:
+    assert SQLCompleter.clean_comment(None) is None
+    assert SQLCompleter.clean_comment('') is None
+    assert SQLCompleter.clean_comment('   ') is None
+    assert SQLCompleter.clean_comment(' plain ') == 'plain'
+    long_comment = 'x' * 150
+    cleaned = SQLCompleter.clean_comment(long_comment)
+    assert cleaned is not None
+    assert len(cleaned) == 100
+    assert cleaned.endswith('…')
+
+
+def test_extend_table_comments_filters_and_escapes() -> None:
+    completer = make_completer()
+    completer.extend_schemata('test')
+    completer.set_dbname('test')
+
+    completer.extend_table_comments([('users', 'All users'), ('empty', ''), ('v_users', 'VIEW'), ('select', 'reserved')])
+
+    assert completer.table_comments['test'] == {'users': 'All users', '`select`': 'reserved'}
+
+
+def test_comment_storage_skipped_when_meta_disabled() -> None:
+    completer = SQLCompleter(smart_completion=True, show_completion_meta=False)
+    completer.extend_schemata('test')
+    completer.set_dbname('test')
+    completer.extend_relations([('users',)], kind='tables')
+
+    completer.extend_columns([('users', 'id', 'User ID')], kind='tables')
+    completer.extend_table_comments([('users', 'All users')])
+
+    assert completer.table_comments == {}
+    assert completer.column_comments == {}
+    # column itself is still stored
+    assert completer.dbmetadata['tables']['test']['users'] == ['*', 'id']
+
+
+def test_load_schema_metadata_replaces_comments() -> None:
+    completer = make_completer()
+    completer.extend_schemata('other')
+    completer.table_comments['other'] = {'stale': 'old'}
+    completer.column_comments['other'] = {'stale': {'c': 'old'}}
+
+    completer.load_schema_metadata(
+        schema='other',
+        table_columns={'users': ['*', 'id']},
+        foreign_keys={},
+        enum_values={},
+        functions={},
+        procedures={},
+        table_comments={'users': 'All users'},
+        column_comments={'users': {'id': 'User ID'}},
+    )
+
+    assert completer.table_comments['other'] == {'users': 'All users'}
+    assert completer.column_comments['other'] == {'users': {'id': 'User ID'}}
+
+
+def test_copy_other_schemas_carries_comments() -> None:
+    source = make_completer()
+    for schema in ('current', 'other'):
+        source.extend_schemata(schema)
+    source.table_comments = {'current': {'t': 'c'}, 'other': {'users': 'All users'}}
+    source.column_comments = {'other': {'users': {'id': 'User ID'}}}
+
+    dest = make_completer()
+    dest.extend_schemata('current')
+    dest.set_dbname('current')
+
+    dest.copy_other_schemas_from(source, exclude='current')
+
+    assert dest.table_comments == {'other': {'users': 'All users'}}
+    assert dest.column_comments == {'other': {'users': {'id': 'User ID'}}}
 
 
 def test_extend_functions_procedures_character_sets_and_collations() -> None:

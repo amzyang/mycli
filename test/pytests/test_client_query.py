@@ -31,6 +31,7 @@ def make_refresh_cli() -> tuple[Any, dict[str, Any]]:
         refresh=lambda executor, callbacks, options: state['refresh_calls'].append((executor, callbacks, options))
     )
     cli.smart_completion = True
+    cli.show_completion_meta = True
     state['callback'] = callback
     return cli, state
 
@@ -64,6 +65,7 @@ def test_refresh_completions_passes_options_to_refresher() -> None:
                 'smart_completion': True,
                 'supported_formats': ['ascii', 'csv'],
                 'keyword_casing': 'upper',
+                'show_completion_meta': True,
             },
         )
     ]
@@ -85,6 +87,7 @@ def test_refresh_completions_updates_dbname_when_reset() -> None:
     cli.completer = SimpleNamespace(keyword_casing='lower', set_dbname=lambda dbname: set_dbname_calls.append(dbname))
     cli.main_formatter = SimpleNamespace(supported_formats=['table'])
     cli.completion_refresher = SimpleNamespace(refresh=lambda executor, callbacks, options: None)
+    cli.show_completion_meta = True
 
     main.MyCli.refresh_completions(cli, reset=True)
 
@@ -100,6 +103,7 @@ def test_refresh_completions_uses_lock_when_reset() -> None:
     cli.completer = SimpleNamespace(keyword_casing='lower', set_dbname=lambda dbname: None)
     cli.main_formatter = SimpleNamespace(supported_formats=['table'])
     cli.completion_refresher = SimpleNamespace(refresh=lambda executor, callbacks, options: None)
+    cli.show_completion_meta = True
 
     main.MyCli.refresh_completions(cli, reset=True)
 

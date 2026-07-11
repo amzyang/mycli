@@ -65,13 +65,15 @@ def make_mycli(
     )
 
 
-def _fake_executor_factory(per_schema_tables, databases=None):
+def _fake_executor_factory(per_schema_tables, databases=None, per_schema_table_comments=None):
     """Build an executor stub whose schema-aware methods yield prebuilt rows."""
+    table_comments = per_schema_table_comments or {}
 
     def make(*_args, **_kwargs):
         executor = MagicMock()
         executor.databases.return_value = list(databases) if databases is not None else []
         executor.table_columns.side_effect = lambda schema=None: iter(per_schema_tables.get(schema, []))
+        executor.table_comments.side_effect = lambda schema=None: iter(table_comments.get(schema, []))
         executor.foreign_keys.side_effect = lambda schema=None: iter([])
         executor.enum_values.side_effect = lambda schema=None: iter([])
         executor.functions.side_effect = lambda schema=None: iter([])
@@ -85,10 +87,15 @@ def _fake_executor_factory(per_schema_tables, databases=None):
 def test_start_configured_skips_current_and_prefetches_others(monkeypatch):
     mycli = make_mycli(prefetch_mode='listed', prefetch_list=['other1', 'current', 'other2'])
     tables = {
-        'other1': [('users', 'id'), ('users', 'email')],
-        'other2': [('orders', 'id')],
+        'other1': [('users', 'id', 'User ID'), ('users', 'email', '')],
+        'other2': [('orders', 'id', '')],
     }
-    monkeypatch.setattr(schema_prefetcher_module, 'SQLExecute', _fake_executor_factory(tables))
+    table_comments = {'other1': [('users', 'All users')]}
+    monkeypatch.setattr(
+        schema_prefetcher_module,
+        'SQLExecute',
+        _fake_executor_factory(tables, per_schema_table_comments=table_comments),
+    )
 
     prefetcher = SchemaPrefetcher(mycli)
     prefetcher.start_configured()
@@ -104,13 +111,16 @@ def test_start_configured_skips_current_and_prefetches_others(monkeypatch):
     # Column list starts with '*' marker and contains escaped column names.
     assert tables_meta['other1']['users'][0] == '*'
     assert 'id' in tables_meta['other1']['users']
+    # Comments flow through prefetch; empty comments are dropped.
+    assert mycli.completer.table_comments['other1'] == {'users': 'All users'}
+    assert mycli.completer.column_comments['other1'] == {'users': {'id': 'User ID'}}
 
 
 def test_start_configured_all_resolves_from_databases(monkeypatch):
     mycli = make_mycli(prefetch_mode='always', databases=['current', 'alpha', 'beta'])
     tables = {
-        'alpha': [('t_a', 'c')],
-        'beta': [('t_b', 'c')],
+        'alpha': [('t_a', 'c', '')],
+        'beta': [('t_b', 'c', '')],
     }
     monkeypatch.setattr(
         schema_prefetcher_module,
@@ -143,7 +153,7 @@ def test_start_configured_noop_when_disabled(monkeypatch):
 
 def test_prefetch_schema_now_loads_single_schema(monkeypatch):
     mycli = make_mycli(prefetch_mode='never')
-    tables = {'target': [('t1', 'c1')]}
+    tables = {'target': [('t1', 'c1', '')]}
     monkeypatch.setattr(schema_prefetcher_module, 'SQLExecute', _fake_executor_factory(tables))
 
     prefetcher = SchemaPrefetcher(mycli)
@@ -190,6 +200,7 @@ def test_start_skips_schemas_already_in_completer(monkeypatch):
             return iter([])
 
         executor.table_columns.side_effect = _track
+        executor.table_comments.side_effect = lambda schema=None: iter([])
         executor.foreign_keys.side_effect = lambda schema=None: iter([])
         executor.enum_values.side_effect = lambda schema=None: iter([])
         executor.functions.side_effect = lambda schema=None: iter([])
@@ -479,7 +490,8 @@ def test_prefetch_one_loads_foreign_keys_enums_functions_and_procedures(monkeypa
     monkeypatch.setattr(prefetcher, '_invalidate_app', invalidate)
 
     executor = MagicMock()
-    executor.table_columns.return_value = iter([('orders', 'id')])
+    executor.table_columns.return_value = iter([('orders', 'id', 'Order ID')])
+    executor.table_comments.return_value = iter([('orders', 'All orders')])
     executor.foreign_keys.return_value = iter([('orders', 'user_id', 'users', 'id')])
     executor.enum_values.return_value = iter([('orders', 'status', ['pending', 'shipped'])])
     executor.functions.return_value = iter([(), ('calc_tax',), (None,)])
@@ -497,6 +509,8 @@ def test_prefetch_one_loads_foreign_keys_enums_functions_and_procedures(monkeypa
         enum_values={'orders': {'status': ['pending', 'shipped']}},
         functions={'calc_tax': None},
         procedures={'rebuild_cache': None},
+        table_comments={'orders': 'All orders'},
+        column_comments={'orders': {'id': 'Order ID'}},
     )
     invalidate.assert_called_once_with()
 

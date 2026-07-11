@@ -165,6 +165,7 @@ def refresh_tables(completer: SQLCompleter, executor: SQLExecute) -> None:
     table_columns_dbresult = list(executor.table_columns())
     completer.extend_relations(table_columns_dbresult, kind="tables")
     completer.extend_columns(table_columns_dbresult, kind="tables")
+    completer.extend_table_comments(executor.table_comments())
 
 
 @refresher("foreign_keys")

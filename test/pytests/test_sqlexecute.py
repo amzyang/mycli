@@ -120,11 +120,13 @@ def test_binary(executor):
 
 @dbtest
 def test_table_and_columns_query(executor):
-    run(executor, "create table a(x text, y text)")
+    run(executor, "create table a(x text comment 'col x', y text) comment='table a'")
     run(executor, "create table b(z text)")
 
     assert set(executor.tables()) == {("a",), ("b",)}
-    assert set(executor.table_columns()) == {("a", "x"), ("a", "y"), ("b", "z")}
+    assert set(executor.table_columns()) == {("a", "x", "col x"), ("a", "y", ""), ("b", "z", "")}
+    # only tables with a non-empty comment are yielded
+    assert dict(executor.table_comments()) == {"a": "table a"}
 
 
 @dbtest
@@ -1136,14 +1138,14 @@ def test_tables_returns_empty_generator_when_no_tables_exist(monkeypatch) -> Non
 
 
 def test_table_columns_executes_query_with_dbname_and_yields_rows(monkeypatch) -> None:
-    cursor = FakeMetadataCursor([('users', 'id'), ('users', 'email'), ('orders', 'id')])
+    cursor = FakeMetadataCursor([('users', 'id', 'User ID'), ('users', 'email', ''), ('orders', 'id', '')])
     executor = make_executor_for_run_tests(FakeMetadataConnection(cursor))
     executor.dbname = 'app_db'
     monkeypatch.setattr(sqlexecute, 'Connection', FakeMetadataConnection)
 
     result = list(executor.table_columns())
 
-    assert result == [('users', 'id'), ('users', 'email'), ('orders', 'id')]
+    assert result == [('users', 'id', 'User ID'), ('users', 'email', ''), ('orders', 'id', '')]
     assert cursor.executed == [(SQLExecute.table_columns_query, ('app_db',))]
     assert cursor.entered is True
     assert cursor.exited is True
@@ -1159,6 +1161,36 @@ def test_table_columns_returns_empty_generator_when_schema_has_no_tables(monkeyp
 
     assert result == []
     assert cursor.executed == [(SQLExecute.table_columns_query, ('empty_db',))]
+
+
+def test_table_comments_executes_query_with_dbname_and_yields_rows(monkeypatch) -> None:
+    cursor = FakeMetadataCursor([('users', 'All users'), ('orders', 'All orders')])
+    executor = make_executor_for_run_tests(FakeMetadataConnection(cursor))
+    executor.dbname = 'app_db'
+    monkeypatch.setattr(sqlexecute, 'Connection', FakeMetadataConnection)
+
+    result = list(executor.table_comments())
+
+    assert result == [('users', 'All users'), ('orders', 'All orders')]
+    assert cursor.executed == [(SQLExecute.table_comments_query, ('app_db',))]
+    assert cursor.entered is True
+    assert cursor.exited is True
+
+
+def test_table_comments_returns_empty_generator_and_logs_execute_errors(monkeypatch, caplog) -> None:
+    cursor = FakeMetadataCursor([], execute_error=RuntimeError('boom'))
+    executor = make_executor_for_run_tests(FakeMetadataConnection(cursor))
+    executor.dbname = 'app_db'
+    monkeypatch.setattr(sqlexecute, 'Connection', FakeMetadataConnection)
+
+    with caplog.at_level('ERROR', logger='mycli.sqlexecute'):
+        result = list(executor.table_comments())
+
+    assert result == []
+    assert cursor.executed == [(SQLExecute.table_comments_query, ('app_db',))]
+    assert cursor.entered is True
+    assert cursor.exited is True
+    assert "No table comment completions due to RuntimeError('boom')" in caplog.text
 
 
 def test_enum_values_executes_query_and_skips_non_enum_columns(monkeypatch) -> None:

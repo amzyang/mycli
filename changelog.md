@@ -121,6 +121,7 @@ Features
 * Add a `/dsn` command to manage persisted DSN aliases.
 * Add `auto` option to ignore keyring when inside an SSH session.
 * Add conditional prompt groups: `\[...\]` hides the whole group when `\u`, `\d`, `\j`, `\J` or `\A` inside it has no value, instead of showing `(none)`.
+* Show table/column comments next to suggestions in the completion menu; configurable via `show_completion_meta`.
 
 
 Documentation

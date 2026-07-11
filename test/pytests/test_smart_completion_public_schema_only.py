@@ -1205,3 +1205,68 @@ def test_join_priority_ignores_cross_schema_table(fk_completer, complete_event):
         c.text for c in fk_completer.get_completions(Document(text=text_no_fk, cursor_position=len(text_no_fk)), complete_event)
     ]
     assert result_cross_schema == result_no_fk
+
+
+@pytest.fixture
+def commented_completer():
+    import mycli.sqlcompleter as sqlcompleter
+
+    comp = sqlcompleter.SQLCompleter(smart_completion=True)
+    comp.extend_schemata("test")
+    comp.set_dbname("test")
+    comp.extend_relations([("users",), ("orders",)], kind="tables")
+    comp.extend_columns(
+        [
+            ("users", "id", "用户ID"),
+            ("users", "email", ""),
+            ("orders", "id", "订单ID"),
+            ("orders", "status", "订单状态"),
+        ],
+        kind="tables",
+    )
+    comp.extend_table_comments([("users", "用户表"), ("orders", "")])
+    return comp
+
+
+def _metas(completions):
+    return {c.text: c.display_meta_text for c in completions}
+
+
+def test_table_completion_shows_table_comment(commented_completer, complete_event):
+    text = "SELECT * FROM "
+    result = list(commented_completer.get_completions(Document(text=text, cursor_position=len(text)), complete_event))
+    assert result[0] == Completion(text="users", start_position=0, display_meta="用户表")
+    metas = _metas(result)
+    # empty comments are dropped
+    assert metas["orders"] == ""
+
+
+def test_column_completion_shows_column_comment(commented_completer, complete_event):
+    text = "SELECT  FROM users"
+    position = len("SELECT ")
+    result = list(commented_completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+    metas = _metas(result)
+    assert metas["id"] == "用户ID"
+    assert metas["email"] == ""
+
+
+def test_column_comment_first_table_wins(commented_completer, complete_event):
+    text = "SELECT  FROM orders, users"
+    position = len("SELECT ")
+    result = list(commented_completer.get_completions(Document(text=text, cursor_position=position), complete_event))
+    assert _metas(result)["id"] == "订单ID"
+
+
+def test_naked_select_shows_column_comments(commented_completer, complete_event):
+    text = "SELECT "
+    result = list(commented_completer.get_completions(Document(text=text, cursor_position=len(text)), complete_event))
+    metas = _metas(result)
+    assert metas["status"] == "订单状态"
+    assert metas["id"] == "用户ID"
+
+
+def test_quoted_table_completion_keeps_comment(commented_completer, complete_event):
+    text = "SELECT * FROM `us"
+    result = list(commented_completer.get_completions(Document(text=text, cursor_position=len(text)), complete_event))
+    metas = _metas(result)
+    assert metas["`users`"] == "用户表"

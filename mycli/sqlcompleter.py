@@ -20,6 +20,7 @@ from mycli.packages.sql_utils import extract_columns_from_select, extract_tables
 
 _logger = logging.getLogger(__name__)
 _CASE_CHANGE_PAT = re.compile('(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])')
+_COMMENT_DISPLAY_MAX = 100
 
 
 class Fuzziness(IntEnum):
@@ -937,9 +938,11 @@ class SQLCompleter(Completer):
         smart_completion: bool = True,
         supported_formats: tuple = (),
         keyword_casing: str = "auto",
+        show_completion_meta: bool = True,
     ) -> None:
         super(self.__class__, self).__init__()
         self.smart_completion = smart_completion
+        self.show_completion_meta = show_completion_meta
         self.reserved_words = set()
         for x in self.keywords:
             self.reserved_words.update(x.split())
@@ -960,6 +963,18 @@ class SQLCompleter(Completer):
 
     def escaped_names(self, names: Collection[str]) -> list[str]:
         return [self.escape_name(name) for name in names]
+
+    @staticmethod
+    def clean_comment(comment: str | None) -> str | None:
+        """Normalize a table/column comment for display: None when empty, truncated when too long."""
+        if not comment:
+            return None
+        comment = comment.strip()
+        if not comment:
+            return None
+        if len(comment) > _COMMENT_DISPLAY_MAX:
+            comment = comment[: _COMMENT_DISPLAY_MAX - 1] + '…'
+        return comment
 
     def extend_special_commands(self, special_commands: list[str]) -> None:
         # Special commands are not part of all_completions since they can only
@@ -1002,36 +1017,35 @@ class SQLCompleter(Completer):
             metadata[schema] = {}
         self.all_completions.update(schema)
 
-    def extend_relations(self, data: list[tuple[str, str]], kind: Literal['tables', 'views']) -> None:
+    def extend_relations(self, data: Iterable[tuple[str, ...]], kind: Literal['tables', 'views']) -> None:
         """Extend metadata for tables or views
 
-        :param data: list of (rel_name, ) tuples
+        :param data: list of (rel_name, ...) tuples; only the first element is used
         :param kind: either 'tables' or 'views'
         :return:
         """
-        data_ll = [self.escaped_names(d) for d in data]
-
         # dbmetadata['tables'][$schema_name][$table_name] should be a list of
         # column names. Default to an asterisk
         metadata = self.dbmetadata[kind]
-        for relname in data_ll:
+        for row in data:
+            relname = self.escape_name(row[0])
             try:
-                metadata[self.dbname][relname[0]] = ["*"]
+                metadata[self.dbname][relname] = ["*"]
             except KeyError:
-                _logger.error("%r %r listed in unrecognized schema %r", kind, relname[0], self.dbname)
-            self.all_completions.add(relname[0])
+                _logger.error("%r %r listed in unrecognized schema %r", kind, relname, self.dbname)
+            self.all_completions.add(relname)
 
-    def extend_columns(self, column_data: list[tuple[str, str]], kind: Literal['tables', 'views']) -> None:
+    def extend_columns(self, column_data: Iterable[tuple[str, ...]], kind: Literal['tables', 'views']) -> None:
         """Extend column metadata
 
-        :param column_data: list of (rel_name, column_name) tuples
+        :param column_data: list of (rel_name, column_name[, column_comment]) tuples
         :param kind: either 'tables' or 'views'
         :return:
         """
-        column_data_ll = [self.escaped_names(d) for d in column_data]
-
         metadata = self.dbmetadata[kind]
-        for relname, column in column_data_ll:
+        for row in column_data:
+            relname = self.escape_name(row[0])
+            column = self.escape_name(row[1])
             if relname not in metadata[self.dbname]:
                 _logger.error("relname '%s' was not found in db '%s'", relname, self.dbname)
                 # this could happen back when the completer populated via two calls:
@@ -1041,6 +1055,20 @@ class SQLCompleter(Completer):
                 continue
             metadata[self.dbname][relname].append(column)
             self.all_completions.add(column)
+            comment = self.clean_comment(row[2]) if len(row) > 2 else None
+            if comment and self.show_completion_meta:
+                self.column_comments.setdefault(self.dbname, {}).setdefault(relname, {})[column] = comment
+
+    def extend_table_comments(self, data: Iterable[tuple[str, str]]) -> None:
+        """Extend table comment metadata from (table_name, table_comment) pairs."""
+        if not self.show_completion_meta:
+            return
+        schema_comments = self.table_comments.setdefault(self.dbname, {})
+        for table, comment in data:
+            cleaned = self.clean_comment(comment)
+            if not cleaned or cleaned == 'VIEW':
+                continue
+            schema_comments[self.escape_name(table)] = cleaned
 
     def extend_enum_values(self, enum_data: Iterable[tuple[str, str, list[str]]]) -> None:
         metadata = self.dbmetadata["enum_values"]
@@ -1165,6 +1193,8 @@ class SQLCompleter(Completer):
         enum_values: dict[str, dict[str, list[str]]],
         functions: dict[str, None],
         procedures: dict[str, None],
+        table_comments: dict[str, str] | None = None,
+        column_comments: dict[str, dict[str, str]] | None = None,
     ) -> None:
         """Atomically replace the completion metadata for *schema*.
 
@@ -1181,6 +1211,8 @@ class SQLCompleter(Completer):
         self.dbmetadata["procedures"][schema] = procedures
         self.dbmetadata["enum_values"][schema] = enum_values
         self.dbmetadata["foreign_keys"][schema] = foreign_keys
+        self.table_comments[schema] = table_comments or {}
+        self.column_comments[schema] = column_comments or {}
         self._register_schema_completions(schema, table_columns, functions)
 
     def copy_other_schemas_from(self, source: "SQLCompleter", exclude: str | None) -> None:
@@ -1202,6 +1234,14 @@ class SQLCompleter(Completer):
                 if schema_name in dest_map:
                     continue
                 dest_map[schema_name] = data
+        for schema_name, tbl_comments in source.table_comments.items():
+            if not schema_name or schema_name == exclude or schema_name in self.table_comments:
+                continue
+            self.table_comments[schema_name] = tbl_comments
+        for schema_name, col_comments in source.column_comments.items():
+            if not schema_name or schema_name == exclude or schema_name in self.column_comments:
+                continue
+            self.column_comments[schema_name] = col_comments
         for schema_name, table_columns in self.dbmetadata["tables"].items():
             if schema_name == exclude:
                 continue
@@ -1238,6 +1278,8 @@ class SQLCompleter(Completer):
             "enum_values": {},
             "foreign_keys": {},
         }
+        self.table_comments: dict[str, dict[str, str]] = {}
+        self.column_comments: dict[str, dict[str, dict[str, str]]] = {}
         self.all_completions = set(self.keywords + self.functions)
 
     def maybe_quote_identifier(self, item: str) -> str:
@@ -1427,6 +1469,8 @@ class SQLCompleter(Completer):
             return (Completion(x[0], -len(text_for_len)) for x in matches)
 
         completions: list[tuple[str, int, int]] = []
+        # candidate string -> comment shown as completion meta (first-seen wins)
+        meta_map: dict[str, str] = {}
         suggestions = suggest_type(document.text, document.text_before_cursor)
         rigid_sort = False
         length_based_on_path = False
@@ -1440,6 +1484,9 @@ class SQLCompleter(Completer):
                 tables = suggestion["tables"]
                 _logger.debug("Completion column scope: %r", tables)
                 scoped_cols = self.populate_scoped_cols(tables)
+                if self.show_completion_meta:
+                    for name, comment in self.scoped_column_comments(tables).items():
+                        meta_map.setdefault(name, comment)
                 if suggestion.get("drop_unique"):
                     # drop_unique is used for 'tb11 JOIN tbl2 USING (...'
                     # which should suggest only columns that appear in more than
@@ -1526,6 +1573,12 @@ class SQLCompleter(Completer):
                     tables = self.populate_schema_objects(suggestion["schema"], "tables", columns)
                 else:
                     tables = self.populate_schema_objects(suggestion["schema"], "tables")
+
+                if self.show_completion_meta:
+                    tbl_comments = self.table_comments.get(suggestion["schema"] or self.dbname, {})
+                    for tbl_name in tables:
+                        if (tbl_comment := tbl_comments.get(tbl_name)) is not None:
+                            meta_map.setdefault(tbl_name, tbl_comment)
 
                 if suggestion.get("join"):
                     # For JOINs, suggest FK-related tables first (lower rank = higher priority)
@@ -1722,10 +1775,16 @@ class SQLCompleter(Completer):
             sorted_completions = sorted(completions, key=lambda item: completion_sort_key(item, text_for_len.lower()))
             uniq_completions_str = dict.fromkeys(x[0] for x in sorted_completions)
 
+        def _meta_for(candidate: str) -> str | None:
+            if not meta_map:
+                return None
+            # candidates may be backtick-quoted by quote_collection_if_needed
+            return meta_map.get(candidate) or meta_map.get(self._strip_backticks(candidate))
+
         if length_based_on_path:
-            return (Completion(x, -len(last_for_len_paths)) for x in uniq_completions_str)
+            return (Completion(x, -len(last_for_len_paths), display_meta=_meta_for(x)) for x in uniq_completions_str)
         else:
-            return (Completion(x, -len(text_for_len)) for x in uniq_completions_str)
+            return (Completion(x, -len(text_for_len), display_meta=_meta_for(x)) for x in uniq_completions_str)
 
     def find_files(self, word: str) -> Generator[tuple[str, int], None, None]:
         """Yield matching directory or file names.
@@ -1796,6 +1855,32 @@ class SQLCompleter(Completer):
                 pass
 
         return columns
+
+    def scoped_column_comments(self, scoped_tbls: list[tuple[str | None, str, str | None]]) -> dict[str, str]:
+        """Collect column comments for the tables in scope, keyed by escaped column name.
+
+        Mirrors the schema/table resolution of :meth:`populate_scoped_cols`; on
+        duplicate column names across tables the first table wins.
+        """
+        comments: dict[str, str] = {}
+
+        # naked SELECT: comments from all tables in the current schema
+        if len(scoped_tbls) == 0 and self.dbname:
+            for table_comments in self.column_comments.get(self.dbname, {}).values():
+                for column, comment in table_comments.items():
+                    comments.setdefault(column, comment)
+            return comments
+
+        for tbl in scoped_tbls:
+            schema = tbl[0] or self.dbname
+            schema_comments = self.column_comments.get(schema, {})
+            for rel_key in {tbl[1], self.escape_name(tbl[1])}:
+                rel_comments = schema_comments.get(rel_key)
+                if rel_comments:
+                    for column, comment in rel_comments.items():
+                        comments.setdefault(column, comment)
+                    break
+        return comments
 
     def populate_enum_values(
         self,
