@@ -18,6 +18,7 @@ class ClientQueryMixin:
         completer: Any
         completion_refresher: Any
         smart_completion: bool
+        show_completion_meta: bool
         main_formatter: Any
         redirect_formatter: Any
         explorer_formatter: Any
@@ -53,6 +54,7 @@ class ClientQueryMixin:
                 "supported_formats": self.main_formatter.supported_formats,
                 "keyword_casing": self.completer.keyword_casing,
                 "indexed_column_suffix": self.completer.indexed_column_suffix,
+                "show_completion_meta": self.show_completion_meta,
             },
         )
 

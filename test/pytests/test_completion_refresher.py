@@ -489,8 +489,9 @@ def test_refresh_helpers_delegate_to_completer_and_executor(monkeypatch) -> None
     executor = Mock()
     executor.dbname = 'current_db'
     executor.databases.return_value = ['db1', 'db2']
-    executor.table_columns.return_value = iter([('tbl', 'col')])
+    executor.table_columns.return_value = iter([('tbl', 'col', 'a column')])
     executor.indexed_columns.return_value = iter([('tbl', 'col')])
+    executor.table_comments.return_value = iter([('tbl', 'a table')])
     executor.foreign_keys.return_value = iter([('tbl', 'col', 'other', 'id')])
     executor.enum_values.return_value = iter([('tbl', 'status', ['open'])])
     executor.users.return_value = iter([('app',)])
@@ -517,9 +518,10 @@ def test_refresh_helpers_delegate_to_completer_and_executor(monkeypatch) -> None
     completer.extend_database_names.assert_called_once_with(['db1', 'db2'])
     completer.extend_schemata.assert_called_once_with('current_db')
     completer.set_dbname.assert_called_once_with('current_db')
-    completer.extend_relations.assert_called_once_with([('tbl', 'col')], kind='tables')
-    completer.extend_columns.assert_called_once_with([('tbl', 'col')], kind='tables')
+    completer.extend_relations.assert_called_once_with([('tbl', 'col', 'a column')], kind='tables')
+    completer.extend_columns.assert_called_once_with([('tbl', 'col', 'a column')], kind='tables')
     completer.extend_indexed_columns.assert_called_once_with(executor.indexed_columns.return_value)
+    completer.extend_table_comments.assert_called_once_with(executor.table_comments.return_value)
     completer.extend_foreign_keys.assert_called_once_with(executor.foreign_keys.return_value)
     completer.extend_enum_values.assert_called_once_with(executor.enum_values.return_value)
     completer.extend_users.assert_called_once_with(executor.users.return_value)
