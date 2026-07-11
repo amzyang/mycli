@@ -102,6 +102,7 @@ def test_special_name_completion(completer, complete_event):
     assert list(result) == [
         Completion(text="\\dt", start_position=-2),
         Completion(text="\\dsn", start_position=-2),
+        Completion(text="\\dgrep", start_position=-2),
     ]
 
 
