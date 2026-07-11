@@ -207,6 +207,7 @@ class MyCli(AppStateMixin, OutputMixin, ClientCommandsMixin, ClientConnectionMix
 
         # Initialize completer.
         self.smart_completion = c["main"].as_bool("smart_completion")
+        self.show_completion_meta = c["main"].as_bool("show_completion_meta")
         self.completer = SQLCompleter(
             self.smart_completion,
             supported_formats=self.main_formatter.supported_formats,
@@ -221,6 +222,7 @@ class MyCli(AppStateMixin, OutputMixin, ClientCommandsMixin, ClientConnectionMix
             rapidfuzz_length_coverage=c['main'].as_float('rapidfuzz_length_coverage')
             if c['main'].get('rapidfuzz_length_coverage')
             else 0.67,
+            show_completion_meta=self.show_completion_meta,
         )
         for error in self.completer.completion_config_errors:
             self.echo(error, err=True, fg='red')
