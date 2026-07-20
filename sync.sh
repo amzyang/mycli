@@ -44,6 +44,8 @@ if not git merge-base --is-ancestor upstream/main HEAD
 end
 
 git push --force-with-lease; or exit 1
+# keep fork tags current, otherwise setuptools-scm versions the pip build off a stale tag
+git push origin --tags; or exit 1
 
 # converge pipx state: mycli at HEAD with catppuccin injected
 set -l head_short (git rev-parse --short=9 HEAD)
