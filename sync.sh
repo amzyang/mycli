@@ -27,7 +27,15 @@ end
 git rebase upstream/main
 if test $status -ne 0
     echo "Rebase hit conflicts, invoking Claude to resolve..."
-    claude -p --dangerously-skip-permissions "/goal A rebase onto upstream/main is in progress and paused on conflicts. Resolve the conflicts and run git rebase --continue, repeating until the rebase is complete."
+    set -l resolve_prompt '/goal A rebase onto upstream/main is in progress and paused on conflicts. Resolve the conflicts and run git rebase --continue, repeating until the rebase is complete.
+
+Conflict resolution rules, learned from the 2026-08-02 incident:
+- This branch is a patch stack on top of upstream/main. For each conflict, recover the intent of the commit being replayed (git show it) and preserve its pre-rebase behavior. Do not mechanically keep both sides.
+- Never keep the same argument, import, or line from both sides. That is exactly how the incident happened: the resolution kept a cursor= keyword argument from each side of one PromptSession call, producing a SyntaxError that broke even mycli --help.
+- When upstream adds code whose behavior a patch already covers or deliberately overrides, keep the patch line and drop the upstream one.
+- Before every git rebase --continue, run: python3 -m compileall -q mycli
+  If it fails, fix the resolution before continuing, so every replayed commit at least parses and the stack stays bisectable.'
+    claude -p --dangerously-skip-permissions $resolve_prompt
 
     # verify the rebase actually completed before pushing
     if test -d (git rev-parse --git-dir)/rebase-merge; or test -d (git rev-parse --git-dir)/rebase-apply
