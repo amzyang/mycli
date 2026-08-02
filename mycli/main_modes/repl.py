@@ -643,7 +643,6 @@ def _build_prompt_session(
             enable_system_prompt=True,
             enable_suspend=True,
             editing_mode=editing_mode,
-            cursor=ModalCursorShapeConfig() if editing_mode == EditingMode.VI else CursorShape.BLOCK,
             search_ignore_case=True,
             cursor=BlinkingCursorShapeConfig(),
         )
