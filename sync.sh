@@ -43,6 +43,12 @@ if not git merge-base --is-ancestor upstream/main HEAD
     exit 1
 end
 
+# smoke: auto-resolved conflicts must at least byte-compile before anything ships
+if not python3 -m compileall -q mycli
+    echo "Error: source fails to compile after rebase, not pushing"
+    exit 1
+end
+
 git push --force-with-lease; or exit 1
 # keep fork tags current, otherwise setuptools-scm versions the pip build off a stale tag
 git push origin --tags; or exit 1
@@ -61,4 +67,10 @@ end
 
 if test "$state[2]" != yes
     pipx inject mycli 'catppuccin[pygments]'; or exit 1
+end
+
+# smoke: the installed CLI must survive its import chain end to end
+if not ~/.local/bin/mycli --help >/dev/null
+    echo "Error: installed mycli fails --help smoke check"
+    exit 1
 end
