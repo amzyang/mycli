@@ -82,3 +82,14 @@ if not ~/.local/bin/mycli --help >/dev/null
     echo "Error: installed mycli fails --help smoke check"
     exit 1
 end
+
+# keep the fish completion file in sync with the installed CLI;
+# write via temp file so a failed generation never truncates the live one
+set -l completion_file ~/.config/fish/completions/mycli.fish
+if ~/.local/bin/mycli --completions fish > $completion_file.tmp
+    mv $completion_file.tmp $completion_file
+else
+    rm -f $completion_file.tmp
+    echo "Error: failed to regenerate fish completions"
+    exit 1
+end
