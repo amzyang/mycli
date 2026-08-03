@@ -6,6 +6,14 @@ function _mycli_dsn_aliases --argument-names insert_prefix incomplete
     end
 end
 
+function _mycli_login_paths --argument-names insert_prefix incomplete
+    mysql_config_editor print --all 2>/dev/null | string replace -rf '^\[(.+)\]$' '$1' | while read -l login_path
+        if test (string sub -s 1 -l (string length -- "$incomplete") -- "$login_path") = "$incomplete"
+            printf '%s%s\n' "$insert_prefix" "$login_path"
+        end
+    end
+end
+
 # Spelling out the args here is much faster than invoking mycli with _MYCLI_COMPLETE.
 function _mycli_is_positional_db_arg
     set -l words (commandline -opc)
@@ -110,6 +118,12 @@ function _mycli_completion
         case '--batch=*'
             _mycli_complete_paths '--batch=' (string replace -- '--batch=' '' "$current")
             return
+        case '--login-path=*'
+            _mycli_login_paths '--login-path=' (string replace -- '--login-path=' '' "$current")
+            return
+        case '-g*'
+            _mycli_login_paths '-g' (string sub -s 3 -- "$current")
+            return
     end
 
     _mycli_click_completions
@@ -119,6 +133,8 @@ function _mycli_completion
             _mycli_dsn_aliases '' "$current"
         case -S --socket --checkpoint --batch
             _mycli_complete_paths '' "$current"
+        case -g --login-path
+            _mycli_login_paths '' "$current"
         case '*'
             if _mycli_is_positional_db_arg
                 _mycli_dsn_aliases '' "$current"
