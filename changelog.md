@@ -103,6 +103,9 @@ Features
 * Sort completion candidates by frecency from history.
 * Add help snippets in special /command completions.
 * Add completions on Polars methods in dataframe transforms.
+* Add `\ed <table>`: edit a table's DDL in `$EDITOR`; the diff comes back as
+  `ALTER TABLE` statements (generated via `mysqldef`'s offline mode) prefilled
+  at the prompt for confirmation.
 
 
 Internal

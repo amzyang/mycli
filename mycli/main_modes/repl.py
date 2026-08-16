@@ -902,6 +902,29 @@ def _one_iteration(
                 mycli.echo(str(e), err=True, fg='red')
                 return
 
+        if special.is_ddl_edit_command(text):
+            try:
+                assert sqlexecute.conn is not None
+                cur = sqlexecute.conn.cursor()
+                alter_sql, message = special.handle_ddl_edit(cur, text)
+            except (RuntimeError, pymysql.err.Error) as e:
+                mycli.logger.error('sql: %r, error: %r', text, e)
+                mycli.logger.error('traceback: %r', traceback.format_exc())
+                mycli.echo(str(e), err=True, fg='red')
+                return
+            if message:
+                mycli.echo(message)
+                return
+            try:
+                assert mycli.prompt_session is not None
+                text = mycli.prompt_session.prompt(
+                    default=alter_sql or '',
+                    inputhook=inputhook,
+                    message=loaded_message_fn,
+                )
+            except KeyboardInterrupt:
+                return
+
     text = text.strip()
     if not text:
         return
