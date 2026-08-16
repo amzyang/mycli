@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import click
 import pytest
 
 from mycli.packages.special import ddledit
@@ -78,6 +79,17 @@ def test_handle_ddl_edit_without_table_returns_usage():
 
 def test_handle_ddl_edit_editor_cancelled(monkeypatch):
     monkeypatch.setattr(ddledit.click, 'edit', lambda *a, **kw: None)
+    sql, message = ddledit.handle_ddl_edit(FakeCursor(CURRENT_DDL), '\\ed users')
+    assert sql is None
+    assert message == 'DDL edit cancelled.'
+
+
+def test_handle_ddl_edit_editor_nonzero_exit(monkeypatch):
+    # nvim :cq makes click.edit raise ClickException; it must not escape the handler.
+    def raise_editing_failed(*_args, **_kwargs):
+        raise click.ClickException('nvim: Editing failed')
+
+    monkeypatch.setattr(ddledit.click, 'edit', raise_editing_failed)
     sql, message = ddledit.handle_ddl_edit(FakeCursor(CURRENT_DDL), '\\ed users')
     assert sql is None
     assert message == 'DDL edit cancelled.'
