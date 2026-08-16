@@ -303,7 +303,12 @@ def open_external_editor(filename: str | None = None, sql: str | None = None) ->
     if filename:
         query = ''
         message = None
-        click.edit(filename=filename)
+        try:
+            click.edit(filename=filename)
+        except click.ClickException as e:
+            # Editor exited non-zero (e.g. vim :cq); surface it instead of
+            # letting the exception kill the REPL.
+            return ('', e.message)
         try:
             with open(filename, 'r') as f:
                 query = f.read()
@@ -313,7 +318,10 @@ def open_external_editor(filename: str | None = None, sql: str | None = None) ->
 
     # Populate the editor buffer with the partial sql (if available) and a
     # placeholder comment.
-    query = click.edit(f"{sql}\n\n{MARKER}", extension=".sql") or ''
+    try:
+        query = click.edit(f"{sql}\n\n{MARKER}", extension=".sql") or ''
+    except click.ClickException as e:
+        return ('', e.message)
 
     if query:
         query = query.split(MARKER, 1)[0].rstrip("\n")

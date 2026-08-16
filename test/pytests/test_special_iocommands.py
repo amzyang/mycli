@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any, Generator
 from unittest.mock import patch
 
+import click
 from jinja2 import TemplateError
 from pymysql import ProgrammingError
 import pytest
@@ -596,6 +597,23 @@ def test_open_external_editor_without_filename(monkeypatch) -> None:
 
     assert query == 'select fallback'
     assert message is None
+
+
+def test_open_external_editor_nonzero_exit(monkeypatch) -> None:
+    # nvim :cq makes click.edit raise ClickException; it must come back as a
+    # message instead of escaping and killing the REPL.
+    def raise_editing_failed(*_args, **_kwargs):
+        raise click.ClickException('nvim: Editing failed')
+
+    monkeypatch.setattr(iocommands.click, 'edit', raise_editing_failed)
+
+    query, message = iocommands.open_external_editor(sql='select 1')
+    assert query == ''
+    assert message == 'nvim: Editing failed'
+
+    query, message = iocommands.open_external_editor(filename='query.sql')
+    assert query == ''
+    assert message == 'nvim: Editing failed'
 
 
 def test_clip_helpers_and_clipboard(monkeypatch) -> None:
