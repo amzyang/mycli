@@ -21,6 +21,8 @@ Features
 Bug Fixes
 ---------
 * Lower Boundary tunnel stabilization pause to 0.15 sec.
+* Don't quit mycli when the editor exits non-zero (e.g. vim `:cq`) during
+  `\ed` or `\e`; treat it as a cancelled edit instead.
 
 
 Documentation
