@@ -827,6 +827,12 @@ def suggest_special(text: str) -> list[dict[str, Any]]:
             {"type": "schema"},
         ]
 
+    if cmd in ["\\ed", "/ed"]:
+        return [
+            {"type": "table", "schema": []},
+            {"type": "schema"},
+        ]
+
     if cmd.lower() in [
         r'\.',
         r'/.',

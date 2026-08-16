@@ -1,5 +1,6 @@
 __lazy_modules__ = [
     'mycli.packages.special.dbcommands',
+    'mycli.packages.special.ddledit',
     'mycli.packages.special.iocommands',
     'mycli.packages.special.llm',
     'mycli.packages.special.main',
@@ -11,6 +12,10 @@ from mycli.packages.special.dbcommands import (
     list_databases,
     list_tables,
     status,
+)
+from mycli.packages.special.ddledit import (
+    handle_ddl_edit,
+    is_ddl_edit_command,
 )
 from mycli.packages.special.grepcommands import (
     grep_data,
@@ -114,7 +119,9 @@ __all__: list[str] = [
     'get_filename',
     'grep_data',
     'grep_schema',
+    'handle_ddl_edit',
     'handle_llm',
+    'is_ddl_edit_command',
     'is_expanded_output',
     'is_explorer_output',
     'is_llm_command',

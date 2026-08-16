@@ -4,6 +4,9 @@ Upcoming (TBD)
 Features
 ---------
 * Advertise beta `--boundary-id` option in helpdoc and completions.
+* Add `\ed <table>`: edit a table's DDL in `$EDITOR`; the diff comes back as
+  `ALTER TABLE` statements (generated via `mysqldef`'s offline mode) prefilled
+  at the prompt for confirmation.
 
 
 2.15.0 (2026/08/20)
