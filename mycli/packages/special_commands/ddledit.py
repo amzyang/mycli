@@ -89,7 +89,11 @@ def handle_ddl_edit(
     if not table:
         return (None, USAGE)
     current_ddl = fetch_create_table(cur, table)
-    edited = click.edit(current_ddl + '\n', extension='.sql')
+    try:
+        edited = click.edit(current_ddl + '\n', extension='.sql')
+    except click.ClickException:
+        # Editor exited non-zero (e.g. vim :cq); treat as a deliberate abort.
+        edited = None
     if edited is None:
         return (None, 'DDL edit cancelled.')
     migration = extract_statements(runner(current_ddl, edited))
