@@ -6,6 +6,10 @@ from mycli.packages.special_commands.db_commands import (
     ping,
     status,
 )
+from mycli.packages.special_commands.ddledit import (
+    handle_ddl_edit,
+    is_ddl_edit_command,
+)
 from mycli.packages.special_commands.grepcommands import (
     grep_data,
     grep_schema,
@@ -109,7 +113,9 @@ __all__: list[str] = [
     'get_filename',
     'grep_data',
     'grep_schema',
+    'handle_ddl_edit',
     'handle_llm',
+    'is_ddl_edit_command',
     'is_expanded_output',
     'is_explorer_output',
     'is_llm_command',
