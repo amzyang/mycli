@@ -61,14 +61,18 @@ git push --force-with-lease; or exit 1
 # keep fork tags current, otherwise setuptools-scm versions the pip build off a stale tag
 git push origin --tags; or exit 1
 
-# converge pipx state: mycli at HEAD with catppuccin injected
+# converge pipx state: mycli[dataframe] at HEAD with catppuccin injected
 set -l head_short (git rev-parse --short=9 HEAD)
-set -l state (pipx list --json 2>/dev/null | python3 -c "import json,sys; m = json.load(sys.stdin)['venvs']['mycli']['metadata']; print(m['main_package']['package_version']); print('yes' if 'catppuccin' in m['injected_packages'] else 'no')" 2>/dev/null)
+set -l spec 'mycli[dataframe] @ git+https://github.com/amzyang/mycli'
+set -l state (pipx list --json 2>/dev/null | python3 -c "import json,sys; m = json.load(sys.stdin)['venvs']['mycli']['metadata']; print(m['main_package']['package_version']); print('yes' if 'catppuccin' in m['injected_packages'] else 'no'); print('yes' if '[dataframe]' in (m['main_package']['package_or_url'] or '') else 'no')" 2>/dev/null)
 
-if string match -q "*+g$head_short*" -- "$state[1]"
+if test -z "$state[1]"
+    pipx install $spec; or exit 1
+else if test "$state[3]" != yes
+    # recorded spec lacks the dataframe extra; --force rewrites the spec in place
+    pipx install --force $spec; or exit 1
+else if string match -q "*+g$head_short*" -- "$state[1]"
     echo "mycli already at +g$head_short, skipping reinstall"
-else if test -z "$state[1]"
-    pipx install 'git+https://github.com/amzyang/mycli'; or exit 1
 else
     pipx reinstall mycli; or exit 1
 end
