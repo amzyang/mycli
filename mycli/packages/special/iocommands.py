@@ -118,7 +118,7 @@ def filter_ignored_warning(result: SQLResult) -> SQLResult | None:
 
     Returns None when every row is filtered out so callers can skip the result entirely.
     """
-    if not IGNORE_WARNINGS:
+    if not IGNORE_WARNINGS or result.rows is None:
         return result
     rows = [row for row in result.rows if row[1] not in IGNORE_WARNINGS]
     if not rows:
