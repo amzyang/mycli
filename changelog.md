@@ -83,7 +83,11 @@ Documentation
 Features
 --------
 * Promote Boundary tunnel feature out of beta.
-
+* Suggest `Did you mean ...?` fixes for unknown-column (1054), missing-table
+  (1146), and syntax (1064) errors by fuzzy-matching identifiers against
+  completion metadata and the query's own SELECT aliases, and misspelled
+  keywords against the keyword and function lists; the corrected query is
+  prefilled at the next prompt so pressing Enter runs it.
 
 Bug Fixes
 --------

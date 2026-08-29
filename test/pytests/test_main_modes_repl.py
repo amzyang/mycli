@@ -2310,3 +2310,139 @@ def test_output_results_covers_remaining_watch_select_and_warning_branches(monke
         start=0.0,
     )
     assert cli.output_calls
+
+
+def make_typo_completer() -> Any:
+    from mycli.sqlcompleter import SQLCompleter
+
+    completer = SQLCompleter()
+    completer.extend_schemata('db')
+    completer.set_dbname('db')
+    completer.extend_relations([('users',)], kind='tables')
+    completer.extend_columns([('users', 'user_name'), ('users', 'user_id')], kind='tables')
+    return completer
+
+
+class TypoSQLExecute:
+    def __init__(self, error: Exception) -> None:
+        self.dbname: str | None = 'db'
+        self.connection_id = 0
+        self.error = error
+
+    def run(self, text: str) -> Iterator[SQLResult]:
+        raise self.error
+
+
+def run_typo_iteration(
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    text: str,
+    completer: Any | None = None,
+    interactive: bool = True,
+) -> tuple[Any, repl_mode.ReplState]:
+    patch_repl_runtime_defaults(monkeypatch)
+    cli = make_repl_cli(TypoSQLExecute(error))
+    if interactive:
+        cli.prompt_session = FakePromptSession()
+    if completer is not None:
+        cli.completer = completer
+    state = repl_mode.ReplState()
+    repl_mode._one_iteration(cli, state, text)
+    return cli, state
+
+
+def test_one_iteration_suggests_correction_for_unknown_column(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.OperationalError(1054, "Unknown column 'usr_nam' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select usr_nam from users', make_typo_completer())
+    assert any("Unknown column 'usr_nam'" in line for line in cli.echo_calls)
+    assert 'Did you mean user_name?' in cli.echo_calls
+    assert state.buffer_text == 'select user_name from users'
+
+
+def test_one_iteration_suggests_correction_for_missing_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.err.ProgrammingError(1146, "Table 'db.userz' doesn't exist")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select * from userz', make_typo_completer())
+    assert 'Did you mean users?' in cli.echo_calls
+    assert state.buffer_text == 'select * from users'
+
+
+def test_one_iteration_suggests_correction_for_keyword_typos(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.err.ProgrammingError(
+        1064,
+        "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server "
+        "version for the right syntax to use near 'selet 1' at line 1",
+    )
+    cli, state = run_typo_iteration(monkeypatch, error, 'selet 1; show createe tabel abc;', make_typo_completer())
+    assert 'Did you mean select 1?' in cli.echo_calls
+    assert state.buffer_text == 'select 1; show createe tabel abc'
+
+
+def test_one_iteration_suggests_select_alias_for_unknown_column(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.OperationalError(1054, "Unknown column 'totl' in 'order clause'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select price*qty as total from users order by totl', make_typo_completer())
+    assert 'Did you mean total?' in cli.echo_calls
+    assert state.buffer_text == 'select price*qty as total from users order by total'
+
+
+def test_one_iteration_typo_suggestion_stays_silent_for_uncached_schema(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.err.ProgrammingError(1146, "Table 'otherdb.userz' doesn't exist")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select * from otherdb.userz', make_typo_completer())
+    assert not any('Did you mean' in line for line in cli.echo_calls)
+    assert state.buffer_text is None
+
+
+def test_one_iteration_scopes_qualified_column_to_its_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    completer = make_typo_completer()
+    completer.extend_relations([('orders',)], kind='tables')
+    completer.extend_columns([('orders', 'usr_note')], kind='tables')
+    error = pymysql.OperationalError(1054, "Unknown column 't.usr_nam' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select t.usr_nam from users t', completer)
+    assert 'Did you mean user_name?' in cli.echo_calls
+    assert state.buffer_text == 'select t.user_name from users t'
+
+
+def test_one_iteration_typo_suggestion_stays_silent_without_a_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.OperationalError(1054, "Unknown column 'zzzzzz' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select zzzzzz from users', make_typo_completer())
+    assert not any('Did you mean' in line for line in cli.echo_calls)
+    assert state.buffer_text is None
+
+
+def test_one_iteration_typo_suggestion_stays_silent_without_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    from mycli.sqlcompleter import SQLCompleter
+
+    error = pymysql.OperationalError(1054, "Unknown column 'usr_nam' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select usr_nam from users', SQLCompleter())
+    assert not any('Did you mean' in line for line in cli.echo_calls)
+    assert state.buffer_text is None
+
+
+def test_one_iteration_typo_suggestion_stays_silent_without_prompt_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.OperationalError(1054, "Unknown column 'usr_nam' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select usr_nam from users', interactive=False)
+    assert not any('Did you mean' in line for line in cli.echo_calls)
+    assert state.buffer_text is None
+
+
+def test_one_iteration_typo_suggestion_without_prefill_on_ambiguous_statement(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.OperationalError(1054, "Unknown column 'usr_nam' in 'field list'")
+    cli, state = run_typo_iteration(monkeypatch, error, 'select usr_nam from users; select usr_nam from users;', make_typo_completer())
+    assert 'Did you mean user_name?' in cli.echo_calls
+    assert state.buffer_text is None
+
+
+def test_one_iteration_typo_suggestion_failure_never_escapes(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.err.ProgrammingError(
+        1064,
+        "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server "
+        "version for the right syntax to use near 'selet 1' at line 1",
+    )
+
+    def broken_suggestion(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError('suggestion machinery broke')
+
+    monkeypatch.setattr(repl_mode, 'suggest_keyword_correction', broken_suggestion)
+    cli, state = run_typo_iteration(monkeypatch, error, 'selet 1', make_typo_completer())
+    assert not any('Did you mean' in line for line in cli.echo_calls)
+    assert state.buffer_text is None
+    assert any('typo suggestion failed' in str(call[0]) for call in cli.logger.error_calls)

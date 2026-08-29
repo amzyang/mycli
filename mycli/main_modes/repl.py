@@ -79,6 +79,7 @@ from mycli.packages.ptoolkit.history import FRECENCY_HISTORY_ENTRIES, FRECENCY_R
 from mycli.packages.special.utils import format_uptime, get_ssl_version, get_uptime, get_warning_count
 from mycli.packages.sql_utils import (
     extract_new_password,
+    extract_tables_from_complete_statements,
     is_dropping_database,
     is_mutating,
     is_password_change,
@@ -89,6 +90,15 @@ from mycli.packages.sql_utils import (
 )
 from mycli.packages.sqlresult import SQLResult
 from mycli.packages.string_utils import sanitize_terminal_title
+from mycli.packages.typo_correction import (
+    SyntaxFragment,
+    TypoSuggestion,
+    UnknownIdentifier,
+    parse_error,
+    qualifier_matches,
+    suggest_identifier_correction,
+    suggest_keyword_correction,
+)
 from mycli.sqlexecute import SQLExecute
 from mycli.types import Query
 
@@ -810,6 +820,61 @@ def _build_prompt_session(
             mycli.prompt_session.app.ttimeoutlen = mycli.emacs_ttimeoutlen
 
 
+def _find_typo_suggestion(
+    mycli: 'MyCli',
+    parsed: SyntaxFragment | UnknownIdentifier,
+    executed_sql: str,
+    original_sql: str,
+) -> TypoSuggestion | None:
+    statements = list(special.split_queries(original_sql))
+    if not statements:
+        return None
+    delimiter = special.get_current_delimiter()
+    completer = mycli.completer
+    if isinstance(parsed, SyntaxFragment):
+        keyword_words = frozenset(word for entry in (*completer.keywords, *completer.functions) for word in entry.split())
+        # all_completions is the completer's flat set of every known name;
+        # a word naming any of them is a real identifier, not a keyword typo.
+        known_identifiers = frozenset(name.strip('`').lower() for name in completer.all_completions)
+        return suggest_keyword_correction(parsed, statements, delimiter, keyword_words, known_identifiers)
+    if parsed.kind == 'table':
+        candidates = completer.populate_schema_objects(parsed.qualifier, 'tables') + completer.populate_schema_objects(
+            parsed.qualifier, 'views'
+        )
+        return suggest_identifier_correction(parsed, statements, delimiter, candidates)
+    scoped_tables = extract_tables_from_complete_statements(executed_sql)
+    if parsed.qualifier:
+        scoped_tables = [table for table in scoped_tables if qualifier_matches(parsed.qualifier, table)]
+    if not scoped_tables:
+        # populate_scoped_cols([]) falls back to every column in the schema
+        return None
+    candidates = [column for column in completer.populate_scoped_cols(scoped_tables) if column != '*']
+    return suggest_identifier_correction(parsed, statements, delimiter, candidates)
+
+
+def _suggest_typo_fix(mycli: 'MyCli', state: ReplState, exc: BaseException, executed_sql: str, original_sql: str) -> None:
+    """Offer a did-you-mean correction after a 1054/1146/1064 error, prefilled at the next prompt."""
+    if mycli.prompt_session is None or not isinstance(exc, pymysql.err.Error):
+        return
+    if len(exc.args) < 2 or not isinstance(exc.args[0], int) or not isinstance(exc.args[1], str):
+        return
+    parsed = parse_error(exc.args[0], exc.args[1])
+    if parsed is None:
+        return
+    try:
+        suggestion = _find_typo_suggestion(mycli, parsed, executed_sql, original_sql)
+    except Exception:
+        # Best-effort feature running inside the REPL's error handler, where an
+        # escaping exception would take down the whole session.
+        mycli.logger.error('typo suggestion failed. sql: %r', original_sql, exc_info=True)
+        return
+    if suggestion is None:
+        return
+    mycli.echo(f'Did you mean {suggestion.display}?', err=True, fg='yellow')
+    if suggestion.corrected_sql is not None:
+        state.buffer_text = suggestion.corrected_sql
+
+
 def _one_iteration(
     mycli: 'MyCli',
     state: ReplState,
@@ -1076,10 +1141,12 @@ def _one_iteration(
             mycli.logger.error('sql: %r, error: %r', text, e1)
             mycli.logger.error('traceback: %r', traceback.format_exc())
             mycli.echo(str(e1), err=True, fg='red')
+            _suggest_typo_fix(mycli, state, e1, text, original_text)
     except Exception as e:
         mycli.logger.error('sql: %r, error: %r', text, e)
         mycli.logger.error('traceback: %r', traceback.format_exc())
         mycli.echo(str(e), err=True, fg='red')
+        _suggest_typo_fix(mycli, state, e, text, original_text)
     else:
         if mycli.sandbox_mode and is_password_change(text):
             new_password = extract_new_password(text)
