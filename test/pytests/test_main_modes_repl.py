@@ -2374,7 +2374,17 @@ def test_one_iteration_suggests_correction_for_keyword_typos(monkeypatch: pytest
     )
     cli, state = run_typo_iteration(monkeypatch, error, 'selet 1; show createe tabel abc;', make_typo_completer())
     assert 'Did you mean select 1?' in cli.echo_calls
-    assert state.buffer_text == 'select 1; show createe tabel abc'
+    assert state.buffer_text == 'select 1; show createe tabel abc;'
+
+
+def test_one_iteration_typo_prefill_without_trailing_delimiter_stays_bare(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = pymysql.err.ProgrammingError(
+        1064,
+        "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server "
+        "version for the right syntax to use near 'selec 1' at line 1",
+    )
+    cli, state = run_typo_iteration(monkeypatch, error, 'selec 1', make_typo_completer())
+    assert state.buffer_text == 'select 1'
 
 
 def test_one_iteration_suggests_select_alias_for_unknown_column(monkeypatch: pytest.MonkeyPatch) -> None:

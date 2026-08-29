@@ -872,7 +872,13 @@ def _suggest_typo_fix(mycli: 'MyCli', state: ReplState, exc: BaseException, exec
         return
     mycli.echo(f'Did you mean {suggestion.display}?', err=True, fg='yellow')
     if suggestion.corrected_sql is not None:
-        state.buffer_text = suggestion.corrected_sql
+        prefill = suggestion.corrected_sql
+        # The splitter strips a trailing delimiter; restore the one the
+        # original input carried so the prefill matches what was typed.
+        delimiter = special.get_current_delimiter()
+        if original_sql.rstrip().endswith(delimiter):
+            prefill += delimiter
+        state.buffer_text = prefill
 
 
 def _one_iteration(
