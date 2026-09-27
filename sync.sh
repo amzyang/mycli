@@ -35,7 +35,7 @@ Conflict resolution rules, learned from the 2026-08-02 incident:
 - When upstream adds code whose behavior a patch already covers or deliberately overrides, keep the patch line and drop the upstream one.
 - Before every git rebase --continue, run: python3 -m compileall -q mycli
   If it fails, fix the resolution before continuing, so every replayed commit at least parses and the stack stays bisectable.'
-    claude -p --dangerously-skip-permissions $resolve_prompt
+    cc -p --dangerously-skip-permissions $resolve_prompt
 
     # verify the rebase actually completed before pushing
     if test -d (git rev-parse --git-dir)/rebase-merge; or test -d (git rev-parse --git-dir)/rebase-apply
