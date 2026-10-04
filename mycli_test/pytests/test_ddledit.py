@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 import pytest
 
-from mycli.packages.special import ddledit
+from mycli.packages.special_commands import ddledit
 
 
 class FakeCursor:

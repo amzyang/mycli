@@ -546,7 +546,9 @@ def test_dsn_more_adds_non_default_runtime_parameters_in_sorted_order() -> None:
     parsed = urlsplit(more_dsn)
     assert (parsed.scheme, parsed.netloc, parsed.path) == ('mysql', 'user@host', '/db')
     more_params = parse_qsl(parsed.query)
-    assert {key for key, _value in more_params} == KNOWN_DSN_QUERY_PARAMS
+    # 'login-path' is accepted in DSN URIs (fork extension) but is input-only;
+    # dsn_more never reflects it back.
+    assert {key for key, _value in more_params} == KNOWN_DSN_QUERY_PARAMS - {'login-path'}
     assert more_params == [
         ('boundary_id', 'ttcp_123'),
         ('character_set', 'utf8'),
