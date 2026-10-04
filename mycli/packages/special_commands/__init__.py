@@ -14,7 +14,7 @@ from mycli.packages.special_commands.grepcommands import (
     grep_data,
     grep_schema,
 )
-from mycli.packages.special_commands.iocommands import (
+from mycli.packages.special_commands.io_commands import (
     clip_command,
     close_tee,
     copy_query_to_clipboard,
