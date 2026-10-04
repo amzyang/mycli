@@ -1446,7 +1446,7 @@ def test_table_comments_executes_query_with_dbname_and_yields_rows(monkeypatch) 
     cursor = FakeMetadataCursor([('users', 'All users'), ('orders', 'All orders')])
     executor = make_executor_for_run_tests(FakeMetadataConnection(cursor))
     executor.dbname = 'app_db'
-    monkeypatch.setattr(sqlexecute, 'Connection', FakeMetadataConnection)
+    monkeypatch.setattr(sql_execute, 'Connection', FakeMetadataConnection)
 
     result = list(executor.table_comments())
 
@@ -1460,9 +1460,9 @@ def test_table_comments_returns_empty_generator_and_logs_execute_errors(monkeypa
     cursor = FakeMetadataCursor([], execute_error=RuntimeError('boom'))
     executor = make_executor_for_run_tests(FakeMetadataConnection(cursor))
     executor.dbname = 'app_db'
-    monkeypatch.setattr(sqlexecute, 'Connection', FakeMetadataConnection)
+    monkeypatch.setattr(sql_execute, 'Connection', FakeMetadataConnection)
 
-    with caplog.at_level('ERROR', logger='mycli.sqlexecute'):
+    with caplog.at_level('ERROR', logger='mycli.packages.execution.sql_execute'):
         result = list(executor.table_comments())
 
     assert result == []
