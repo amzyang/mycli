@@ -928,10 +928,10 @@ def _find_typo_suggestion(
     executed_sql: str,
     original_sql: str,
 ) -> TypoSuggestion | None:
-    statements = list(special.split_queries(original_sql))
+    statements = list(special_commands.split_queries(original_sql))
     if not statements:
         return None
-    delimiter = special.get_current_delimiter()
+    delimiter = special_commands.get_current_delimiter()
     completer = mycli.completer
     if isinstance(parsed, SyntaxFragment):
         keyword_words = frozenset(word for entry in (*completer.keywords, *completer.functions) for word in entry.split())
@@ -977,7 +977,7 @@ def _suggest_typo_fix(mycli: 'MyCli', state: ReplState, exc: BaseException, exec
         prefill = suggestion.corrected_sql
         # The splitter strips a trailing delimiter; restore the one the
         # original input carried so the prefill matches what was typed.
-        delimiter = special.get_current_delimiter()
+        delimiter = special_commands.get_current_delimiter()
         if original_sql.rstrip().endswith(delimiter):
             prefill += delimiter
         state.buffer_text = prefill
@@ -1075,11 +1075,11 @@ def _one_iteration(
                 mycli.echo(str(e), err=True, fg='red')
                 return
 
-        if special.is_ddl_edit_command(text):
+        if special_commands.is_ddl_edit_command(text):
             try:
-                assert sqlexecute.conn is not None
-                cur = sqlexecute.conn.cursor()
-                alter_sql, message = special.handle_ddl_edit(cur, text)
+                assert sql_execute.conn is not None
+                cur = sql_execute.conn.cursor()
+                alter_sql, message = special_commands.handle_ddl_edit(cur, text)
             except (RuntimeError, pymysql.err.Error) as e:
                 mycli.logger.error('sql: %r, error: %r', text, e)
                 mycli.logger.error('traceback: %r', traceback.format_exc())
