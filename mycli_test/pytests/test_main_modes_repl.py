@@ -3368,7 +3368,7 @@ def test_output_results_covers_remaining_watch_select_and_warning_branches(monke
 
 
 def make_typo_completer() -> Any:
-    from mycli.sqlcompleter import SQLCompleter
+    from mycli.packages.completion.sql_completer import SQLCompleter
 
     completer = SQLCompleter()
     completer.extend_schemata('db')
@@ -3474,7 +3474,7 @@ def test_one_iteration_typo_suggestion_stays_silent_without_a_match(monkeypatch:
 
 
 def test_one_iteration_typo_suggestion_stays_silent_without_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    from mycli.sqlcompleter import SQLCompleter
+    from mycli.packages.completion.sql_completer import SQLCompleter
 
     error = pymysql.OperationalError(1054, "Unknown column 'usr_nam' in 'field list'")
     cli, state = run_typo_iteration(monkeypatch, error, 'select usr_nam from users', SQLCompleter())

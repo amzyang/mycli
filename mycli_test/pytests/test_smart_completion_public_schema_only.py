@@ -1659,7 +1659,7 @@ def test_join_priority_ignores_cross_schema_table(fk_completer, complete_event):
 
 @pytest.fixture
 def commented_completer():
-    import mycli.sqlcompleter as sqlcompleter
+    import mycli.packages.completion.sql_completer as sqlcompleter
 
     comp = sqlcompleter.SQLCompleter(smart_completion=True)
     comp.extend_schemata("test")

@@ -125,7 +125,7 @@ class ClientQueryMixin:
             if special_commands.is_show_warnings_enabled() and isinstance(result.rows, Cursor) and result.rows.warning_count > 0:
                 warnings = self.sql_execute.run("SHOW WARNINGS")
                 for warning in warnings:
-                    warning = special.filter_ignored_warning(warning)
+                    warning = special_commands.filter_ignored_warning(warning)
                     if warning is None:
                         continue
                     output = self.format_sqlresult(
