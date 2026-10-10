@@ -71,13 +71,22 @@ if test "$installed_commit" = (git rev-parse HEAD)
     echo "mycli already at $installed_commit, skipping reinstall"
 else
     # --reinstall implies --refresh, so the unpinned git ref is re-resolved to the pushed HEAD;
-    # --force lets a changed spec (extras / --with) replace the existing receipt instead of erroring
-    uv tool install --force --reinstall $spec --with 'catppuccin[pygments]'; or exit 1
+    # --force lets a changed spec (extras / --with) replace the existing receipt instead of erroring;
+    # Pythons without a sqlglotc wheel (cp315) build it from sdist, which compiles whatever sqlglot its
+    # isolated build env resolves (unpinned upstream), so constrain it to our runtime pin
+    set -l sqlglot_pin (string match -rg '"(sqlglot [^"]+)"' < pyproject.toml); or exit 1
+    uv tool install --force --reinstall $spec --with 'catppuccin[pygments]' --build-constraints (echo $sqlglot_pin | psub); or exit 1
 end
 
 # smoke: the installed CLI must survive its import chain end to end
 if not ~/.local/bin/mycli --help >/dev/null
     echo "Error: installed mycli fails --help smoke check"
+    exit 1
+end
+
+# smoke: --help never builds a tokenizer, so a compiled sqlglotc out of step with sqlglot only breaks completion
+if not ~/.local/share/uv/tools/mycli/bin/python -I -c "import sqlglot; sqlglot.tokenize('select 1')"
+    echo "Error: installed sqlglot fails tokenize smoke check"
     exit 1
 end
 
