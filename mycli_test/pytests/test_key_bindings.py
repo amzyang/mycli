@@ -5,8 +5,10 @@ from types import SimpleNamespace
 from typing import Any, Callable, cast
 
 import prompt_toolkit
+from prompt_toolkit.document import Document
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+from prompt_toolkit.key_binding.vi_state import InputMode, ViState
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout.controls import BufferControl, SearchBufferControl
 from prompt_toolkit.selection import SelectionType
@@ -38,7 +40,10 @@ class DummyOutput:
 @dataclass
 class DummyBuffer:
     text: str = ''
+    cursor_position: int = 0
     complete_state: object | None = None
+    selection_state: object | None = None
+    exit_selection_calls: int = 0
     complete_next_calls: int = 0
     cancel_completion_calls: int = 0
     open_in_editor_calls: list[bool] = field(default_factory=list)
@@ -47,6 +52,10 @@ class DummyBuffer:
     transform_calls: list[tuple[int, int, Callable[[str], str]]] = field(default_factory=list)
     inserted_text: list[str] = field(default_factory=list)
     validate_calls: int = 0
+
+    @property
+    def document(self) -> Document:
+        return Document(self.text, self.cursor_position)
 
     def complete_next(self) -> None:
         self.complete_next_calls += 1
@@ -81,12 +90,16 @@ class DummyBuffer:
     def validate_and_handle(self) -> None:
         self.validate_calls += 1
 
+    def exit_selection(self) -> None:
+        self.exit_selection_calls += 1
+
 
 @dataclass
 class DummyApp:
     current_buffer: DummyBuffer
     editing_mode: EditingMode = EditingMode.VI
     ttimeoutlen: float | None = None
+    vi_state: ViState = field(default_factory=ViState)
     output: DummyOutput = field(default_factory=DummyOutput)
     exit_calls: list[dict[str, Any]] = field(default_factory=list)
     print_calls: list[Any] = field(default_factory=list)
@@ -345,7 +358,7 @@ def test_escape_binding_cancels_completion_menu(
 ) -> None:
     mycli = DummyMyCli(DummyKeysConfig())
     kb = key_bindings.mycli_bindings(mycli)
-    event = make_event(DummyBuffer(complete_state=object()))
+    event = make_event(DummyBuffer(text='abc', cursor_position=3, complete_state=object()))
     event.app.editing_mode = editing_mode
     monkeypatch.setattr(key_bindings, 'get_app', lambda: event.app)
     patch_filter_app(monkeypatch, event.app)
@@ -363,6 +376,12 @@ def test_escape_binding_cancels_completion_menu(
 
     assert event.app.current_buffer.cancel_completion_calls == 1
     assert event.app.current_buffer.complete_state is None
+    if editing_mode == EditingMode.VI:
+        assert event.app.vi_state.input_mode == InputMode.NAVIGATION
+        assert event.app.current_buffer.cursor_position == 2
+    else:
+        assert event.app.vi_state.input_mode == InputMode.INSERT
+        assert event.app.current_buffer.cursor_position == 3
 
 
 @pytest.mark.parametrize('key, config_name', [(Keys.ControlI, 'tab'), (Keys.ControlAt, 'control_space')])
